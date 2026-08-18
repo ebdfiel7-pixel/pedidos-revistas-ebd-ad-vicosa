@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#224b6a">
+  <meta name="description" content="Pedidos trimestrais de revistas da EBD - AD Viçosa">
+  <title>Pedidos de Revistas EBD - AD Viçosa</title>
+  <link rel="icon" type="image/png" href="img/favicon.png">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand-wrap">
+      <img src="img/logo-ad-vicosa.png" alt="AD Viçosa Madureira" class="brand-logo">
+      <div class="brand-title">
+        <strong>Pedidos de Revistas EBD</strong>
+        <span>AD Viçosa</span>
+      </div>
+    </div>
+  </header>
+
+  <main class="app-shell">
+    <section id="loadingView" class="panel centered">
+      <div class="spinner" aria-hidden="true"></div>
+      <h1>Carregando pedidos</h1>
+      <p>Conectando ao sistema da EBD...</p>
+    </section>
+
+    <section id="setupView" class="panel hidden">
+      <div class="status-icon warning">!</div>
+      <h1>Configuração necessária</h1>
+      <p>O endereço do Google Apps Script ainda não foi configurado neste aplicativo.</p>
+      <p class="muted">Depois de publicar o Apps Script, cole a URL do Web App no arquivo <code>config.js</code>.</p>
+    </section>
+
+    <section id="closedView" class="panel hidden">
+      <div class="status-icon lock">🔒</div>
+      <h1>Pedidos encerrados</h1>
+      <p id="closedMessage">O período de pedidos está fechado.</p>
+    </section>
+
+    <section id="appView" class="hidden">
+      <div class="period-card">
+        <div>
+          <span class="eyebrow">Período atual</span>
+          <strong id="periodLabel">—</strong>
+        </div>
+        <div id="deadlineWrap" class="deadline hidden">
+          <span>Prazo</span>
+          <strong id="deadlineLabel">—</strong>
+        </div>
+      </div>
+
+      <nav class="steps" aria-label="Etapas do pedido">
+        <button class="step active" data-step="1" type="button"><span>1</span><small>Identificação</small></button>
+        <button class="step" data-step="2" type="button"><span>2</span><small>Revistas</small></button>
+        <button class="step" data-step="3" type="button"><span>3</span><small>Conferência</small></button>
+      </nav>
+
+      <section id="step1" class="panel step-panel">
+        <div class="section-heading">
+          <span class="eyebrow">Etapa 1 de 3</span>
+          <h1>Identifique sua unidade</h1>
+          <p>Selecione a Sede ou sua congregação e informe o responsável pelo pedido.</p>
+        </div>
+
+        <div id="existingOrderBanner" class="notice info hidden">
+          <strong>Pedido já localizado.</strong>
+          <span>As quantidades existentes serão carregadas para conferência ou edição.</span>
+        </div>
+
+        <div class="form-grid">
+          <label class="field full">
+            <span>Unidade da EBD</span>
+            <select id="unitSelect" required>
+              <option value="">Selecione...</option>
+            </select>
+          </label>
+
+          <label class="field">
+            <span>Responsável pelo pedido</span>
+            <input id="responsibleInput" type="text" maxlength="100" autocomplete="name" placeholder="Nome completo" required>
+          </label>
+
+          <label class="field">
+            <span>Telefone / WhatsApp</span>
+            <input id="phoneInput" type="tel" maxlength="20" autocomplete="tel" inputmode="tel" placeholder="(31) 99999-9999" required>
+          </label>
+        </div>
+
+        <div class="actions right">
+          <button id="goProductsBtn" class="btn primary" type="button">Continuar</button>
+        </div>
+      </section>
+
+      <section id="step2" class="panel step-panel hidden">
+        <div class="section-heading sticky-heading">
+          <div>
+            <span class="eyebrow">Etapa 2 de 3</span>
+            <h1>Informe as quantidades</h1>
+            <p>Os códigos da editora são administrativos e não aparecem nesta tela.</p>
+          </div>
+          <div class="running-total">
+            <span>Total</span>
+            <strong id="runningTotal">0</strong>
+          </div>
+        </div>
+
+        <div id="catalogContainer" class="catalog"></div>
+
+        <div class="actions split sticky-actions">
+          <button class="btn secondary" type="button" data-back="1">Voltar</button>
+          <button id="goReviewBtn" class="btn primary" type="button">Conferir pedido</button>
+        </div>
+      </section>
+
+      <section id="step3" class="panel step-panel hidden">
+        <div class="section-heading">
+          <span class="eyebrow">Etapa 3 de 3</span>
+          <h1>Confira antes de enviar</h1>
+          <p>Revise a unidade, o responsável e todas as quantidades.</p>
+        </div>
+
+        <div class="review-meta">
+          <div><span>Unidade</span><strong id="reviewUnit">—</strong></div>
+          <div><span>Responsável</span><strong id="reviewResponsible">—</strong></div>
+          <div><span>Telefone</span><strong id="reviewPhone">—</strong></div>
+          <div><span>Período</span><strong id="reviewPeriod">—</strong></div>
+        </div>
+
+        <div class="review-table-wrap">
+          <table class="review-table">
+            <thead><tr><th>Revista / material</th><th>Qtd.</th></tr></thead>
+            <tbody id="reviewBody"></tbody>
+            <tfoot><tr><th>Total de exemplares</th><th id="reviewTotal">0</th></tr></tfoot>
+          </table>
+        </div>
+
+        <div class="notice warning-soft">
+          Ao confirmar, este pedido será registrado na planilha da Superintendência da EBD. Caso já exista um pedido desta unidade no mesmo trimestre, ele será atualizado.
+        </div>
+
+        <div class="actions split">
+          <button class="btn secondary" type="button" data-back="2">Voltar e corrigir</button>
+          <button id="submitBtn" class="btn primary success" type="button">Confirmar pedido</button>
+        </div>
+      </section>
+
+      <section id="successView" class="panel hidden centered">
+        <div class="status-icon success">✓</div>
+        <span class="eyebrow">Pedido registrado</span>
+        <h1>Pedido enviado com sucesso</h1>
+        <p>Guarde o protocolo abaixo para referência.</p>
+        <div class="protocol-card">
+          <span>Protocolo</span>
+          <strong id="protocolLabel">—</strong>
+        </div>
+        <div class="success-summary" id="successSummary"></div>
+        <button id="newOrderBtn" class="btn secondary" type="button">Voltar ao início</button>
+      </section>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <span>Escola Bíblica Dominical • AD Viçosa</span>
+  </footer>
+
+  <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
+
+  <script src="config.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
