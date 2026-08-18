@@ -1,15 +1,15 @@
-const CACHE_NAME = 'pedidos-ebd-v2-4-redesign';
+const CACHE_NAME = 'pedidos-ebd-v2-4-1-completo';
 const APP_SHELL = [
   './',
   './index.html',
-  './config.js',
-  './css/style.css',
-  './js/app.js',
-  './manifest.webmanifest',
-  './img/logo-ad-vicosa.png',
-  './img/icon-192.png',
-  './img/icon-512.png',
-  './img/favicon.png'
+  './config.js?v=2.4.1',
+  './css/style.css?v=2.4.1',
+  './js/app.js?v=2.4.1',
+  './manifest.webmanifest?v=2.4.1',
+  './img/logo-ad-vicosa.png?v=2.4.1',
+  './img/icon-192.png?v=2.4.1',
+  './img/icon-512.png?v=2.4.1',
+  './img/favicon.png?v=2.4.1'
 ];
 
 self.addEventListener('install', event => {
