@@ -2,13 +2,21 @@
   'use strict';
 
   const SUPERINTENDENCIA_WHATSAPP = '5531988636425';
+  const ADMIN_TOKEN_KEY = 'pedidosEbdAdminToken';
 
   const state = {
     boot: null,
     quantities: {},
     currentStep: 1,
     existingOrder: null,
-    isSubmitting: false
+    isSubmitting: false,
+    admin: {
+      token: readSessionToken(),
+      dashboard: null,
+      filter: 'all',
+      returnView: 'appView',
+      isBusy: false
+    }
   };
 
   const el = id => document.getElementById(id);
@@ -70,6 +78,26 @@
 
     $all('[data-back]').forEach(button => {
       button.addEventListener('click', () => goToStep(Number(button.dataset.back)));
+    });
+
+    el('adminAccessBtn').addEventListener('click', openAdmin);
+    el('backToOrdersBtn').addEventListener('click', () => window.location.reload());
+    el('adminLoginForm').addEventListener('submit', adminLogin);
+    el('adminRefreshBtn').addEventListener('click', loadAdminDashboard);
+    el('adminLogoutBtn').addEventListener('click', adminLogout);
+    el('adminUnitFilter').addEventListener('change', event => {
+      state.admin.filter = event.target.value;
+      renderAdminUnitList();
+    });
+    el('copyPendingBtn').addEventListener('click', copyPendingMessage);
+    el('toggleOrdersBtn').addEventListener('click', toggleOrdersStatus);
+    el('adminUnitList').addEventListener('click', event => {
+      const row = event.target.closest('[data-admin-unit]');
+      if (row) openAdminOrder(row.dataset.adminUnit);
+    });
+    el('adminOrderModalClose').addEventListener('click', closeAdminOrderModal);
+    el('adminOrderModal').addEventListener('click', event => {
+      if (event.target === el('adminOrderModal')) closeAdminOrderModal();
     });
   }
 
@@ -418,8 +446,368 @@
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
+  async function openAdmin() {
+    const currentPublicView = ['loadingView', 'setupView', 'closedView', 'appView']
+      .find(id => !el(id).classList.contains('hidden'));
+    if (currentPublicView) state.admin.returnView = currentPublicView;
+
+    showOnly('adminView');
+    closeAdminOrderModal();
+
+    if (state.admin.token) {
+      await loadAdminDashboard();
+    } else {
+      showAdminLogin();
+    }
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  function showAdminLogin(message = '') {
+    el('adminLoginPanel').classList.remove('hidden');
+    el('adminDashboardPanel').classList.add('hidden');
+    el('adminPasswordInput').value = '';
+    if (message) toast(message, true);
+    setTimeout(() => el('adminPasswordInput').focus(), 50);
+  }
+
+  async function adminLogin(event) {
+    event.preventDefault();
+    if (state.admin.isBusy) return;
+
+    const password = el('adminPasswordInput').value;
+    if (password.length < 8) {
+      toast('Digite a senha do painel com pelo menos 8 caracteres.', true);
+      return;
+    }
+
+    state.admin.isBusy = true;
+    const button = el('adminLoginBtn');
+    const originalText = button.textContent;
+    button.disabled = true;
+    button.textContent = 'Entrando...';
+
+    const requestId = createRequestId();
+    try {
+      await postNoCors({ action: 'adminLogin', requestId, password });
+      const result = await waitForAdminResult('adminLoginStatus', requestId);
+      if (!result?.ok || !result?.token) throw new Error(result?.message || 'Senha inválida.');
+
+      state.admin.token = result.token;
+      writeSessionToken(result.token);
+      el('adminPasswordInput').value = '';
+      state.admin.isBusy = false;
+      await loadAdminDashboard();
+    } catch (error) {
+      console.error(error);
+      toast(error.message || 'Não foi possível acessar o painel.', true);
+    } finally {
+      state.admin.isBusy = false;
+      button.disabled = false;
+      button.textContent = originalText;
+    }
+  }
+
+  async function loadAdminDashboard() {
+    if (!state.admin.token || state.admin.isBusy) {
+      if (!state.admin.token) showAdminLogin();
+      return;
+    }
+
+    state.admin.isBusy = true;
+    try {
+      const result = await jsonp('adminDashboard', { token: state.admin.token }, 12000);
+      if (!result?.ok) {
+        if (result?.code === 'ADMIN_SESSION_INVALID') {
+          clearAdminToken();
+          showAdminLogin('Sua sessão administrativa expirou. Entre novamente.');
+          return;
+        }
+        throw new Error(result?.message || 'Não foi possível carregar o painel.');
+      }
+
+      state.admin.dashboard = result;
+      el('adminLoginPanel').classList.add('hidden');
+      el('adminDashboardPanel').classList.remove('hidden');
+      renderAdminDashboard();
+    } catch (error) {
+      console.error(error);
+      toast(error.message || 'Não foi possível atualizar o painel.', true);
+    } finally {
+      state.admin.isBusy = false;
+    }
+  }
+
+  function renderAdminDashboard() {
+    const data = state.admin.dashboard;
+    if (!data) return;
+
+    const p = data.periodo;
+    const periodoLabel = `${ordinal(p.trimestre)} Trimestre de ${p.ano}`;
+    el('adminPeriodLabel').textContent = periodoLabel;
+    el('metricUnits').textContent = String(data.metricas.unidades);
+    el('metricReceived').textContent = String(data.metricas.recebidos);
+    el('metricPending').textContent = String(data.metricas.pendentes);
+    el('metricCopies').textContent = String(data.metricas.exemplares);
+
+    el('adminOpenStatus').textContent = p.pedidosAbertos ? 'Pedidos abertos' : 'Pedidos fechados';
+    el('adminDeadlineText').textContent = p.dataLimite
+      ? `Prazo configurado: ${formatDate(p.dataLimite)}`
+      : 'Nenhuma data-limite foi definida.';
+    el('toggleOrdersBtn').textContent = p.pedidosAbertos ? 'Fechar pedidos' : 'Abrir pedidos';
+    el('toggleOrdersBtn').dataset.nextOpen = p.pedidosAbertos ? 'false' : 'true';
+
+    renderAdminUnitList();
+    renderPendingList();
+    renderAdminBetelSummary();
+  }
+
+  function renderAdminUnitList() {
+    const data = state.admin.dashboard;
+    if (!data) return;
+
+    const filter = state.admin.filter;
+    const rows = data.unidades.filter(unit => {
+      if (filter === 'sent') return unit.enviado;
+      if (filter === 'pending') return !unit.enviado;
+      return true;
+    });
+
+    el('adminUnitList').innerHTML = rows.map(unit => {
+      const tag = unit.enviado
+        ? '<span class="status-badge sent">✓ Enviado</span>'
+        : '<span class="status-badge pending">⏳ Pendente</span>';
+      const meta = unit.enviado
+        ? `${escapeHtml(unit.responsavel || 'Responsável não informado')} • ${escapeHtml(formatDateTime(unit.atualizadoEm))}`
+        : 'Nenhum pedido registrado neste trimestre';
+      const inner = `
+        <div class="admin-unit-main">
+          <div class="admin-unit-name">${escapeHtml(unit.nome)}</div>
+          <div class="admin-unit-meta">${meta}</div>
+        </div>
+        <div class="admin-unit-side">
+          ${tag}
+          <span class="admin-unit-total">${unit.enviado ? `${Number(unit.total || 0)} exemplares` : '—'}</span>
+        </div>`;
+      return unit.enviado
+        ? `<button class="admin-unit-row" type="button" data-admin-unit="${escapeHtml(unit.id)}">${inner}</button>`
+        : `<div class="admin-unit-row">${inner}</div>`;
+    }).join('') || '<div class="pending-empty">Nenhuma unidade neste filtro.</div>';
+  }
+
+  function renderPendingList() {
+    const data = state.admin.dashboard;
+    if (!data) return;
+    const pending = data.unidades.filter(unit => !unit.enviado);
+    const container = el('adminPendingList');
+    if (!pending.length) {
+      container.innerHTML = '<div class="pending-empty">Todas as unidades já enviaram o pedido.</div>';
+      el('copyPendingBtn').disabled = true;
+      return;
+    }
+    container.innerHTML = pending.map(unit => `<span class="pending-chip">${escapeHtml(unit.nome)}</span>`).join('');
+    el('copyPendingBtn').disabled = false;
+  }
+
+  function renderAdminBetelSummary() {
+    const data = state.admin.dashboard;
+    if (!data) return;
+    el('adminBetelBody').innerHTML = data.resumoBetel.map(item => {
+      const qtd = Number(item.quantidade || 0);
+      return `
+        <tr>
+          <td>${escapeHtml(item.produto)}</td>
+          <td>${escapeHtml(item.categoria)}</td>
+          <td>${escapeHtml(item.codigo || '—')}</td>
+          <td class="${qtd > 0 ? 'positive' : 'zero'}">${qtd}</td>
+        </tr>`;
+    }).join('');
+    el('adminBetelTotal').textContent = String(data.metricas.exemplares || 0);
+  }
+
+  async function openAdminOrder(unitId) {
+    if (!state.admin.token) return;
+    try {
+      const result = await jsonp('adminPedido', { token: state.admin.token, unidadeId: unitId }, 10000);
+      if (!result?.ok) {
+        if (result?.code === 'ADMIN_SESSION_INVALID') {
+          clearAdminToken();
+          showAdminLogin('Sua sessão administrativa expirou. Entre novamente.');
+          return;
+        }
+        throw new Error(result?.message || 'Não foi possível abrir o pedido.');
+      }
+      const order = result.pedido;
+      if (!order) {
+        toast('Esta unidade ainda não possui pedido no período atual.', true);
+        return;
+      }
+
+      el('adminOrderModalTitle').textContent = order.unidade;
+      el('adminOrderMeta').innerHTML = `
+        <div><span>Protocolo</span><strong>${escapeHtml(order.protocolo)}</strong></div>
+        <div><span>Responsável</span><strong>${escapeHtml(order.responsavel || '—')}</strong></div>
+        <div><span>Telefone</span><strong>${escapeHtml(order.telefone || '—')}</strong></div>
+        <div><span>Atualizado em</span><strong>${escapeHtml(formatDateTime(order.atualizadoEm))}</strong></div>`;
+      el('adminOrderItems').innerHTML = order.itens.map(item => `
+        <tr>
+          <td>${escapeHtml(item.produto)}</td>
+          <td>${escapeHtml(item.codigo || '—')}</td>
+          <td class="positive">${Number(item.quantidade || 0)}</td>
+        </tr>`).join('');
+      el('adminOrderTotal').textContent = String(order.total || 0);
+      el('adminOrderModal').classList.remove('hidden');
+      document.body.style.overflow = 'hidden';
+    } catch (error) {
+      console.error(error);
+      toast(error.message || 'Não foi possível abrir os detalhes.', true);
+    }
+  }
+
+  function closeAdminOrderModal() {
+    const modal = el('adminOrderModal');
+    if (modal) modal.classList.add('hidden');
+    document.body.style.overflow = '';
+  }
+
+  async function copyPendingMessage() {
+    const data = state.admin.dashboard;
+    if (!data) return;
+    const pending = data.unidades.filter(unit => !unit.enviado).map(unit => unit.nome);
+    if (!pending.length) {
+      toast('Não há unidades pendentes.');
+      return;
+    }
+    const periodo = `${ordinal(data.periodo.trimestre)} Trimestre de ${data.periodo.ano}`;
+    const deadline = data.periodo.dataLimite ? ` O prazo é ${formatDate(data.periodo.dataLimite)}.` : '';
+    const message = [
+      '*PEDIDOS DE REVISTAS EBD*',
+      '',
+      `Prezados responsáveis pela EBD, ainda não identificamos o envio do pedido de revistas do ${periodo}.${deadline}`,
+      '',
+      '*Unidades pendentes:*',
+      ...pending.map(name => `• ${name}`),
+      '',
+      'Pedimos a gentileza de realizar o pedido dentro do prazo estabelecido.'
+    ].join('\n');
+
+    try {
+      await copyText(message);
+      toast('Mensagem de cobrança copiada.');
+    } catch (error) {
+      console.error(error);
+      toast('Não foi possível copiar a mensagem.', true);
+    }
+  }
+
+  async function toggleOrdersStatus() {
+    const data = state.admin.dashboard;
+    if (!data || state.admin.isBusy) return;
+    const nextOpen = el('toggleOrdersBtn').dataset.nextOpen === 'true';
+    const verb = nextOpen ? 'abrir' : 'fechar';
+    if (!window.confirm(`Deseja realmente ${verb} os pedidos do período atual?`)) return;
+
+    state.admin.isBusy = true;
+    const button = el('toggleOrdersBtn');
+    const originalText = button.textContent;
+    button.disabled = true;
+    button.textContent = 'Atualizando...';
+    const requestId = createRequestId();
+
+    try {
+      await postNoCors({
+        action: 'adminAlterarPedidos',
+        requestId,
+        token: state.admin.token,
+        aberto: nextOpen
+      });
+      const result = await waitForAdminResult('adminActionStatus', requestId);
+      if (!result?.ok) throw new Error(result?.message || 'Não foi possível alterar o período.');
+      state.admin.isBusy = false;
+      await loadAdminDashboard();
+      toast(nextOpen ? 'Pedidos abertos com sucesso.' : 'Pedidos fechados com sucesso.');
+    } catch (error) {
+      console.error(error);
+      toast(error.message || 'Não foi possível alterar o período.', true);
+    } finally {
+      state.admin.isBusy = false;
+      button.disabled = false;
+      if (button.textContent === 'Atualizando...') button.textContent = originalText;
+    }
+  }
+
+  function adminLogout() {
+    clearAdminToken();
+    state.admin.dashboard = null;
+    showAdminLogin();
+    toast('Sessão administrativa encerrada.');
+  }
+
+  function clearAdminToken() {
+    state.admin.token = '';
+    try { sessionStorage.removeItem(ADMIN_TOKEN_KEY); } catch (_) {}
+  }
+
+  function readSessionToken() {
+    try { return sessionStorage.getItem(ADMIN_TOKEN_KEY) || ''; } catch (_) { return ''; }
+  }
+
+  function writeSessionToken(token) {
+    try { sessionStorage.setItem(ADMIN_TOKEN_KEY, token); } catch (_) {}
+  }
+
+  async function postNoCors(payload) {
+    await fetch(getApiUrl(), {
+      method: 'POST',
+      mode: 'no-cors',
+      cache: 'no-store',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify(payload)
+    });
+  }
+
+  async function waitForAdminResult(action, requestId) {
+    let lastResult = null;
+    for (let attempt = 0; attempt < 12; attempt += 1) {
+      if (attempt > 0) await sleep(500);
+      try {
+        const result = await jsonp(action, { requestId }, 7000);
+        lastResult = result;
+        if (result?.ready) return result;
+      } catch (_) {}
+    }
+    if (lastResult?.message) throw new Error(lastResult.message);
+    throw new Error('O servidor não confirmou a operação administrativa.');
+  }
+
+  async function copyText(text) {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text);
+      return;
+    }
+    const area = document.createElement('textarea');
+    area.value = text;
+    area.setAttribute('readonly', '');
+    area.style.position = 'fixed';
+    area.style.opacity = '0';
+    document.body.appendChild(area);
+    area.select();
+    const ok = document.execCommand('copy');
+    area.remove();
+    if (!ok) throw new Error('Falha ao copiar.');
+  }
+
+  function formatDateTime(value) {
+    if (!value) return '—';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return String(value);
+    return new Intl.DateTimeFormat('pt-BR', {
+      dateStyle: 'short',
+      timeStyle: 'short'
+    }).format(date);
+  }
+
   function showOnly(viewId) {
-    ['loadingView', 'setupView', 'closedView', 'appView'].forEach(id => {
+    ['loadingView', 'setupView', 'closedView', 'appView', 'adminView'].forEach(id => {
       el(id).classList.toggle('hidden', id !== viewId);
     });
   }
