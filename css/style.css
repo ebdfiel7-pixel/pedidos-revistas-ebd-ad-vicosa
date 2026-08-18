@@ -62,8 +62,13 @@ button { cursor: pointer; }
   flex-direction: column;
   gap: 2px;
 }
-.brand-title strong { font-size: 1.04rem; }
-.brand-title span { color: rgba(255,255,255,.78); font-size: .9rem; }
+.brand-title strong {
+  font-size: 1.28rem;
+  line-height: 1.15;
+  font-weight: 850;
+  letter-spacing: .01em;
+  text-shadow: 0 1px 1px rgba(0,0,0,.10);
+}
 
 .app-shell {
   width: min(980px, calc(100% - 28px));
@@ -346,8 +351,7 @@ code { background: #eef3f6; padding: 2px 6px; border-radius: 6px; }
   .brand-wrap { min-height: 66px; gap: 11px; }
   .brand-logo { width: 157px; max-height: 52px; }
   .brand-title { padding-left: 11px; }
-  .brand-title strong { font-size: .88rem; }
-  .brand-title span { font-size: .78rem; }
+  .brand-title strong { font-size: 1.02rem; }
   .app-shell { width: min(100% - 18px, 980px); margin-top: 16px; }
   .panel { padding: 20px 16px; border-radius: 16px; }
   .period-card { padding: 14px 15px; }
@@ -370,8 +374,7 @@ code { background: #eef3f6; padding: 2px 6px; border-radius: 6px; }
 
 @media (max-width: 430px) {
   .brand-logo { width: 139px; }
-  .brand-title strong { font-size: .79rem; }
-  .brand-title span { font-size: .7rem; }
+  .brand-title strong { font-size: .94rem; }
   .period-card { align-items: flex-start; }
   .deadline { text-align: left; }
   .product-row { grid-template-columns: 1fr; }
