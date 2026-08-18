@@ -403,7 +403,7 @@
     return [
       '*PEDIDO DE REVISTAS EBD*',
       '',
-      `Congregação/Unidade: ${unidade}`,
+      `Sede / Congregação: ${unidade}`,
       `Protocolo: ${protocolo}`,
       `Período: ${periodo}`,
       `Responsável: ${responsavel}`,
@@ -591,7 +591,7 @@
       return unit.enviado
         ? `<button class="admin-unit-row" type="button" data-admin-unit="${escapeHtml(unit.id)}">${inner}</button>`
         : `<div class="admin-unit-row">${inner}</div>`;
-    }).join('') || '<div class="pending-empty">Nenhuma unidade neste filtro.</div>';
+    }).join('') || '<div class="pending-empty">Nenhum registro neste filtro.</div>';
   }
 
   function renderPendingList() {
@@ -600,7 +600,7 @@
     const pending = data.unidades.filter(unit => !unit.enviado);
     const container = el('adminPendingList');
     if (!pending.length) {
-      container.innerHTML = '<div class="pending-empty">Todas as unidades já enviaram o pedido.</div>';
+      container.innerHTML = '<div class="pending-empty">A Sede e todas as congregações já enviaram o pedido.</div>';
       el('copyPendingBtn').disabled = true;
       return;
     }
@@ -638,7 +638,7 @@
       }
       const order = result.pedido;
       if (!order) {
-        toast('Esta unidade ainda não possui pedido no período atual.', true);
+        toast('Esta Sede ou congregação ainda não possui pedido no período atual.', true);
         return;
       }
 
@@ -674,7 +674,7 @@
     if (!data) return;
     const pending = data.unidades.filter(unit => !unit.enviado).map(unit => unit.nome);
     if (!pending.length) {
-      toast('Não há unidades pendentes.');
+      toast('Não há pedidos pendentes.');
       return;
     }
     const periodo = `${ordinal(data.periodo.trimestre)} Trimestre de ${data.periodo.ano}`;
@@ -684,7 +684,7 @@
       '',
       `Prezados responsáveis pela EBD, ainda não identificamos o envio do pedido de revistas do ${periodo}.${deadline}`,
       '',
-      '*Unidades pendentes:*',
+      '*Sede / Congregações pendentes:*',
       ...pending.map(name => `• ${name}`),
       '',
       'Pedimos a gentileza de realizar o pedido dentro do prazo estabelecido.'

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'pedidos-ebd-v2-0-painel-superintendente';
+const CACHE_NAME = 'pedidos-ebd-v2-1-terminologia-congregacoes';
 const APP_SHELL = [
   './',
   './index.html',
