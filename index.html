@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#0b3f6f">
+  <meta name="theme-color" content="#075184">
   <meta name="description" content="Pedidos trimestrais de revistas da EBD - AD Viçosa">
   <title>Pedidos de Revistas EBD - AD Viçosa</title>
   <link rel="icon" type="image/png" href="img/favicon.png">
@@ -42,9 +42,17 @@
 
     <section id="appView" class="hidden">
       <div class="period-card">
-        <div>
-          <span class="eyebrow">Período atual</span>
-          <strong id="periodLabel">—</strong>
+        <div class="period-main">
+          <div class="period-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="9"></circle>
+              <path d="M12 7v5l3 2"></path>
+            </svg>
+          </div>
+          <div class="period-copy">
+            <span class="eyebrow">Período atual</span>
+            <strong id="periodLabel">—</strong>
+          </div>
         </div>
         <div id="deadlineWrap" class="deadline hidden">
           <span>Prazo</span>
@@ -71,19 +79,19 @@
         </div>
 
         <div class="form-grid">
-          <label class="field full">
+          <label class="field full field-unit">
             <span>Sede ou Congregação</span>
             <select id="unitSelect" required>
               <option value="">Selecione...</option>
             </select>
           </label>
 
-          <label class="field">
+          <label class="field field-person">
             <span>Responsável pelo pedido</span>
             <input id="responsibleInput" type="text" maxlength="100" autocomplete="name" placeholder="Nome completo" required>
           </label>
 
-          <label class="field">
+          <label class="field field-phone">
             <span>Telefone / WhatsApp</span>
             <input id="phoneInput" type="tel" maxlength="20" autocomplete="tel" inputmode="tel" placeholder="(31) 99999-9999" required>
           </label>
