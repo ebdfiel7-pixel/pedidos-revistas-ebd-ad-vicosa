@@ -1,6 +1,8 @@
 (() => {
   'use strict';
 
+  const SUPERINTENDENCIA_WHATSAPP = '5531988636425';
+
   const state = {
     boot: null,
     quantities: {},
@@ -320,12 +322,72 @@
   function showSuccess(confirmation) {
     $all('.step-panel').forEach(panel => panel.classList.add('hidden'));
     el('successView').classList.remove('hidden');
-    el('protocolLabel').textContent = confirmation.protocolo || '—';
+
+    const protocolo = confirmation.protocolo || '—';
+    const unidade = confirmation.unidade || el('reviewUnit').textContent || '—';
+    const periodo = el('periodLabel').textContent;
+    const responsavel = el('responsibleInput').value.trim();
+    const telefone = el('phoneInput').value.trim();
+    const itens = getSelectedItems();
+    const total = getTotal();
+
+    el('protocolLabel').textContent = protocolo;
     el('successSummary').innerHTML = `
-      <strong>${escapeHtml(confirmation.unidade || el('reviewUnit').textContent)}</strong><br>
-      ${escapeHtml(el('periodLabel').textContent)}<br>
-      Total: <strong>${getTotal()} exemplares</strong>`;
+      <strong>${escapeHtml(unidade)}</strong><br>
+      ${escapeHtml(periodo)}<br>
+      Total: <strong>${total} exemplares</strong>`;
+
+    el('successOrderItems').innerHTML = itens
+      .map(item => `
+        <div class="success-order-row">
+          <span>${escapeHtml(item.nome)}</span>
+          <strong>${item.quantidade}</strong>
+        </div>`)
+      .join('');
+    el('successOrderTotal').textContent = String(total);
+
+    const mensagem = buildWhatsAppMessage({
+      protocolo,
+      unidade,
+      periodo,
+      responsavel,
+      telefone,
+      itens,
+      total
+    });
+    el('whatsappBtn').href = `https://wa.me/${SUPERINTENDENCIA_WHATSAPP}?text=${encodeURIComponent(mensagem)}`;
+
     window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  function getSelectedItems() {
+    if (!state.boot?.produtos) return [];
+    return state.boot.produtos
+      .map(product => ({
+        nome: product.nome,
+        quantidade: Number(state.quantities[product.id] || 0)
+      }))
+      .filter(item => item.quantidade > 0);
+  }
+
+  function buildWhatsAppMessage({ protocolo, unidade, periodo, responsavel, telefone, itens, total }) {
+    const linhasItens = itens.map(item => `${item.quantidade}x ${item.nome}`).join('\n');
+    return [
+      '*PEDIDO DE REVISTAS EBD*',
+      '',
+      `Congregação/Unidade: ${unidade}`,
+      `Protocolo: ${protocolo}`,
+      `Período: ${periodo}`,
+      `Responsável: ${responsavel}`,
+      `Telefone: ${telefone}`,
+      '',
+      '*Itens solicitados:*',
+      linhasItens,
+      '',
+      `*Total: ${total} exemplares*`,
+      '',
+      'Pedido registrado pelo aplicativo Pedidos de Revistas EBD - AD Viçosa.'
+    ].join('\n');
   }
 
   function resetApp() {
