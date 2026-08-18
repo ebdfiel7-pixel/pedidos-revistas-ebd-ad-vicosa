@@ -22,7 +22,7 @@
   const el = id => document.getElementById(id);
   const $all = selector => Array.from(document.querySelectorAll(selector));
 
-  document.addEventListener('DOMContentLoaded', init);
+  document.addEventListener('DOMContentLoaded', () => { initSplash(); init(); });
 
   async function init() {
     bindEvents();
@@ -46,6 +46,32 @@
       el('setupView').querySelector('h1').textContent = 'Não foi possível conectar';
       el('setupView').querySelector('p').textContent = 'Verifique a publicação do Google Apps Script e tente novamente.';
     }
+  }
+
+
+  function initSplash() {
+    const splash = el('splashScreen');
+    if (!splash) return;
+
+    const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches;
+    const minimumTime = reduceMotion ? 300 : 1650;
+    const startedAt = performance.now();
+
+    const dismiss = () => {
+      const elapsed = performance.now() - startedAt;
+      const wait = Math.max(0, minimumTime - elapsed);
+      window.setTimeout(() => {
+        document.body.classList.remove('splash-active');
+        splash.classList.add('splash-leaving');
+        window.setTimeout(() => splash.remove(), reduceMotion ? 100 : 650);
+      }, wait);
+    };
+
+    if (document.readyState === 'complete') dismiss();
+    else window.addEventListener('load', dismiss, { once: true });
+
+    // Segurança: nunca mantenha a tela de abertura presa por falha de rede.
+    window.setTimeout(dismiss, reduceMotion ? 600 : 2600);
   }
 
   function getApiUrl() {
@@ -931,7 +957,7 @@
   function registerServiceWorker() {
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./sw.js?v=2.4.1').catch(error => console.warn('Service Worker:', error));
+        navigator.serviceWorker.register('./sw.js?v=2.5').catch(error => console.warn('Service Worker:', error));
       });
     }
   }
