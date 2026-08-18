@@ -157,7 +157,20 @@
           <strong id="protocolLabel">—</strong>
         </div>
         <div class="success-summary" id="successSummary"></div>
-        <button id="newOrderBtn" class="btn secondary" type="button">Voltar ao início</button>
+
+        <div class="success-order-summary" aria-labelledby="successOrderTitle">
+          <h2 id="successOrderTitle">Resumo do pedido</h2>
+          <div id="successOrderItems" class="success-order-items"></div>
+          <div class="success-order-total">
+            <span>Total de exemplares</span>
+            <strong id="successOrderTotal">0</strong>
+          </div>
+        </div>
+
+        <div class="success-actions">
+          <a id="whatsappBtn" class="btn whatsapp" href="#" target="_blank" rel="noopener noreferrer">Enviar pedido pelo WhatsApp</a>
+          <button id="newOrderBtn" class="btn secondary" type="button">Voltar ao início</button>
+        </div>
       </section>
     </section>
   </main>
