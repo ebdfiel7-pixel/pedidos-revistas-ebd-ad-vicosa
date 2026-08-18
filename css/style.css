@@ -317,6 +317,60 @@ code { background: #eef3f6; padding: 2px 6px; border-radius: 6px; }
 .protocol-card span { display: block; font-size: .75rem; text-transform: uppercase; color: var(--muted); letter-spacing: .08em; }
 .protocol-card strong { display: block; margin-top: 5px; font-size: 1.25rem; color: var(--brand); word-break: break-word; }
 .success-summary { color: var(--muted); line-height: 1.6; margin-bottom: 22px; }
+.success-order-summary {
+  width: min(620px, 100%);
+  margin: 0 auto 22px;
+  text-align: left;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  overflow: hidden;
+  background: #fff;
+}
+.success-order-summary h2 {
+  margin: 0;
+  padding: 14px 16px;
+  font-size: 1rem;
+  color: var(--brand);
+  background: #f1f6f9;
+  border-bottom: 1px solid var(--line);
+}
+.success-order-items { display: flex; flex-direction: column; }
+.success-order-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 18px;
+  align-items: center;
+  padding: 11px 16px;
+  border-bottom: 1px solid #edf1f4;
+}
+.success-order-row span { line-height: 1.35; }
+.success-order-row strong { color: var(--brand); min-width: 34px; text-align: right; }
+.success-order-total {
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+  align-items: center;
+  padding: 13px 16px;
+  color: var(--brand);
+  background: var(--brand-soft);
+  font-weight: 800;
+}
+.success-actions {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.btn.whatsapp {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+  background: #128c4e;
+  color: #fff;
+  box-shadow: 0 7px 18px rgba(18, 140, 78, .18);
+}
+.btn.whatsapp:hover { background: #0f7a43; }
 
 .spinner {
   width: 42px;
@@ -368,6 +422,10 @@ code { background: #eef3f6; padding: 2px 6px; border-radius: 6px; }
   .qty-btn { width: 36px; height: 36px; }
   .qty-input { width: 50px; height: 36px; }
   .review-meta { grid-template-columns: 1fr; }
+  .success-actions { flex-direction: column; }
+  .success-actions .btn { width: 100%; }
+  .success-order-row { padding: 10px 12px; gap: 10px; }
+  .success-order-total { padding: 12px; }
   .actions.split { gap: 8px; }
   .actions.split .btn { flex: 1; padding-left: 10px; padding-right: 10px; }
 }
