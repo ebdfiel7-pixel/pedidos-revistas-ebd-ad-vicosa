@@ -173,11 +173,150 @@
         </div>
       </section>
     </section>
+
+    <section id="adminView" class="hidden" aria-label="Painel do Superintendente">
+      <div class="admin-top-actions">
+        <button id="backToOrdersBtn" class="btn secondary compact" type="button">← Voltar aos pedidos</button>
+      </div>
+
+      <section id="adminLoginPanel" class="panel admin-login-panel">
+        <div class="status-icon admin">🔐</div>
+        <span class="eyebrow">Área restrita</span>
+        <h1>Painel do Superintendente</h1>
+        <p>Acesse para acompanhar os pedidos do trimestre, pendências e o resumo para a Editora Betel.</p>
+        <form id="adminLoginForm" class="admin-login-form">
+          <label class="field">
+            <span>Senha</span>
+            <input id="adminPasswordInput" type="password" minlength="8" autocomplete="current-password" placeholder="Digite a senha do painel" required>
+          </label>
+          <button id="adminLoginBtn" class="btn primary" type="submit">Entrar no painel</button>
+        </form>
+        <p class="admin-login-help">A senha é configurada na própria Planilha Google e não fica armazenada no GitHub.</p>
+      </section>
+
+      <section id="adminDashboardPanel" class="hidden">
+        <div class="admin-dashboard-head">
+          <div>
+            <span class="eyebrow">Superintendência EBD</span>
+            <h1>Painel de Pedidos</h1>
+            <p id="adminPeriodLabel">—</p>
+          </div>
+          <div class="admin-head-actions">
+            <button id="adminRefreshBtn" class="btn secondary compact" type="button">Atualizar</button>
+            <button id="adminLogoutBtn" class="btn secondary compact" type="button">Sair</button>
+          </div>
+        </div>
+
+        <div class="admin-metrics">
+          <article class="metric-card">
+            <span>Unidades</span>
+            <strong id="metricUnits">0</strong>
+          </article>
+          <article class="metric-card success-tone">
+            <span>Pedidos recebidos</span>
+            <strong id="metricReceived">0</strong>
+          </article>
+          <article class="metric-card warning-tone">
+            <span>Pendentes</span>
+            <strong id="metricPending">0</strong>
+          </article>
+          <article class="metric-card brand-tone">
+            <span>Total de exemplares</span>
+            <strong id="metricCopies">0</strong>
+          </article>
+        </div>
+
+        <section class="panel admin-control-card">
+          <div>
+            <span class="eyebrow">Recebimento</span>
+            <h2 id="adminOpenStatus">—</h2>
+            <p id="adminDeadlineText" class="muted">—</p>
+          </div>
+          <button id="toggleOrdersBtn" class="btn primary" type="button">—</button>
+        </section>
+
+        <div class="admin-grid">
+          <section class="panel admin-section">
+            <div class="admin-section-head">
+              <div>
+                <span class="eyebrow">Acompanhamento</span>
+                <h2>Pedidos por unidade</h2>
+              </div>
+              <label class="admin-filter">
+                <span class="sr-only">Filtrar unidades</span>
+                <select id="adminUnitFilter">
+                  <option value="all">Todas</option>
+                  <option value="sent">Enviadas</option>
+                  <option value="pending">Pendentes</option>
+                </select>
+              </label>
+            </div>
+            <div id="adminUnitList" class="admin-unit-list"></div>
+          </section>
+
+          <section class="panel admin-section">
+            <div class="admin-section-head">
+              <div>
+                <span class="eyebrow">Pendências</span>
+                <h2>Ainda não enviaram</h2>
+              </div>
+            </div>
+            <div id="adminPendingList" class="pending-list"></div>
+            <button id="copyPendingBtn" class="btn secondary full-width" type="button">Copiar mensagem de cobrança</button>
+          </section>
+        </div>
+
+        <section class="panel admin-section admin-betel-section">
+          <div class="admin-section-head">
+            <div>
+              <span class="eyebrow">Editora Betel</span>
+              <h2>Resumo consolidado por código</h2>
+              <p>Quantidades somadas de todas as unidades para o pedido à editora.</p>
+            </div>
+          </div>
+          <div class="admin-table-wrap">
+            <table class="admin-table">
+              <thead>
+                <tr><th>Produto</th><th>Categoria</th><th>Código Betel</th><th>Qtd.</th></tr>
+              </thead>
+              <tbody id="adminBetelBody"></tbody>
+              <tfoot>
+                <tr><th colspan="3">TOTAL GERAL</th><th id="adminBetelTotal">0</th></tr>
+              </tfoot>
+            </table>
+          </div>
+        </section>
+      </section>
+    </section>
+
   </main>
 
   <footer class="footer">
     <span>Escola Bíblica Dominical • AD Viçosa</span>
+    <button id="adminAccessBtn" class="footer-admin-link" type="button">Área do Superintendente</button>
   </footer>
+
+
+
+  <div id="adminOrderModal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="adminOrderModalTitle">
+    <div class="modal-card">
+      <div class="modal-head">
+        <div>
+          <span class="eyebrow">Detalhes do pedido</span>
+          <h2 id="adminOrderModalTitle">—</h2>
+        </div>
+        <button id="adminOrderModalClose" class="modal-close" type="button" aria-label="Fechar">×</button>
+      </div>
+      <div id="adminOrderMeta" class="review-meta"></div>
+      <div class="admin-table-wrap">
+        <table class="admin-table">
+          <thead><tr><th>Produto</th><th>Código Betel</th><th>Qtd.</th></tr></thead>
+          <tbody id="adminOrderItems"></tbody>
+          <tfoot><tr><th colspan="2">TOTAL</th><th id="adminOrderTotal">0</th></tr></tfoot>
+        </table>
+      </div>
+    </div>
+  </div>
 
   <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
 
