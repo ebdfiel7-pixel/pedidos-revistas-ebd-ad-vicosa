@@ -1,4 +1,4 @@
-const CACHE_NAME = 'pedidos-ebd-v1-configurado';
+const CACHE_NAME = 'pedidos-ebd-v1-5-identifique-congregacao';
 const APP_SHELL = [
   './',
   './index.html',
