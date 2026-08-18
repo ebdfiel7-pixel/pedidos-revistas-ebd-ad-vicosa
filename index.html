@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#224b6a">
+  <meta name="theme-color" content="#174f78">
   <meta name="description" content="Pedidos trimestrais de revistas da EBD - AD Viçosa">
   <title>Pedidos de Revistas EBD - AD Viçosa</title>
   <link rel="icon" type="image/png" href="img/favicon.png">
@@ -226,6 +226,19 @@
           </article>
         </div>
 
+        <section class="admin-progress-card" aria-label="Progresso dos pedidos">
+          <div class="admin-progress-head">
+            <div>
+              <span class="eyebrow">Progresso do trimestre</span>
+              <strong id="adminProgressLabel">0 de 20 pedidos recebidos</strong>
+            </div>
+            <span id="adminProgressPercent" class="admin-progress-percent">0%</span>
+          </div>
+          <div class="admin-progress-track" aria-hidden="true">
+            <div id="adminProgressFill" class="admin-progress-fill" style="width:0%"></div>
+          </div>
+        </section>
+
         <section class="panel admin-control-card">
           <div>
             <span class="eyebrow">Recebimento</span>
@@ -262,7 +275,10 @@
               </div>
             </div>
             <div id="adminPendingList" class="pending-list"></div>
-            <button id="copyPendingBtn" class="btn secondary full-width" type="button">Copiar mensagem de cobrança</button>
+            <div class="pending-actions">
+              <button id="copyPendingBtn" class="btn secondary full-width" type="button">Copiar mensagem</button>
+              <a id="whatsappPendingBtn" class="btn whatsapp full-width" href="#" target="_blank" rel="noopener noreferrer">Enviar pelo WhatsApp</a>
+            </div>
           </section>
         </div>
 

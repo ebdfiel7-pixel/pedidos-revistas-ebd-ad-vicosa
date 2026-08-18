@@ -90,6 +90,7 @@
       renderAdminUnitList();
     });
     el('copyPendingBtn').addEventListener('click', copyPendingMessage);
+    el('whatsappPendingBtn').addEventListener('click', preparePendingWhatsApp);
     el('toggleOrdersBtn').addEventListener('click', toggleOrdersStatus);
     el('adminUnitList').addEventListener('click', event => {
       const row = event.target.closest('[data-admin-unit]');
@@ -549,6 +550,13 @@
     el('metricPending').textContent = String(data.metricas.pendentes);
     el('metricCopies').textContent = String(data.metricas.exemplares);
 
+    const totalCadastros = Number(data.metricas.unidades || 0);
+    const recebidos = Number(data.metricas.recebidos || 0);
+    const progresso = totalCadastros > 0 ? Math.round((recebidos / totalCadastros) * 100) : 0;
+    el('adminProgressLabel').textContent = `${recebidos} de ${totalCadastros} pedidos recebidos`;
+    el('adminProgressPercent').textContent = `${progresso}%`;
+    el('adminProgressFill').style.width = `${Math.max(0, Math.min(100, progresso))}%`;
+
     el('adminOpenStatus').textContent = p.pedidosAbertos ? 'Pedidos abertos' : 'Pedidos fechados';
     el('adminDeadlineText').textContent = p.dataLimite
       ? `Prazo configurado: ${formatDate(p.dataLimite)}`
@@ -566,31 +574,40 @@
     if (!data) return;
 
     const filter = state.admin.filter;
-    const rows = data.unidades.filter(unit => {
-      if (filter === 'sent') return unit.enviado;
-      if (filter === 'pending') return !unit.enviado;
+    const rows = data.unidades.filter(item => {
+      if (filter === 'sent') return item.enviado;
+      if (filter === 'pending') return !item.enviado;
       return true;
     });
 
-    el('adminUnitList').innerHTML = rows.map(unit => {
-      const tag = unit.enviado
+    el('adminUnitList').innerHTML = rows.map(item => {
+      const tag = item.enviado
         ? '<span class="status-badge sent">✓ Enviado</span>'
         : '<span class="status-badge pending">⏳ Pendente</span>';
-      const meta = unit.enviado
-        ? `${escapeHtml(unit.responsavel || 'Responsável não informado')} • ${escapeHtml(formatDateTime(unit.atualizadoEm))}`
-        : 'Nenhum pedido registrado neste trimestre';
+
+      const details = item.enviado
+        ? `<div class="admin-unit-details">
+             <span><b>Responsável:</b> ${escapeHtml(item.responsavel || '—')}</span>
+             <span><b>Telefone:</b> ${escapeHtml(item.telefone || '—')}</span>
+             <span><b>Protocolo:</b> ${escapeHtml(item.protocolo || '—')}</span>
+             <span><b>Atualizado:</b> ${escapeHtml(formatDateTime(item.atualizadoEm))}</span>
+           </div>`
+        : '<div class="admin-unit-details pending-text"><span>Nenhum pedido registrado neste trimestre.</span></div>';
+
       const inner = `
         <div class="admin-unit-main">
-          <div class="admin-unit-name">${escapeHtml(unit.nome)}</div>
-          <div class="admin-unit-meta">${meta}</div>
+          <div class="admin-unit-name">${escapeHtml(item.nome)}</div>
+          ${details}
         </div>
         <div class="admin-unit-side">
           ${tag}
-          <span class="admin-unit-total">${unit.enviado ? `${Number(unit.total || 0)} exemplares` : '—'}</span>
+          <span class="admin-unit-total">${item.enviado ? `${Number(item.total || 0)} exemplares` : '—'}</span>
+          ${item.enviado ? '<span class="admin-unit-open">Ver pedido →</span>' : ''}
         </div>`;
-      return unit.enviado
-        ? `<button class="admin-unit-row" type="button" data-admin-unit="${escapeHtml(unit.id)}">${inner}</button>`
-        : `<div class="admin-unit-row">${inner}</div>`;
+
+      return item.enviado
+        ? `<button class="admin-unit-row sent-row" type="button" data-admin-unit="${escapeHtml(item.id)}">${inner}</button>`
+        : `<div class="admin-unit-row pending-row">${inner}</div>`;
     }).join('') || '<div class="pending-empty">Nenhum registro neste filtro.</div>';
   }
 
@@ -602,10 +619,15 @@
     if (!pending.length) {
       container.innerHTML = '<div class="pending-empty">A Sede e todas as congregações já enviaram o pedido.</div>';
       el('copyPendingBtn').disabled = true;
+      el('whatsappPendingBtn').classList.add('disabled');
+      el('whatsappPendingBtn').setAttribute('aria-disabled', 'true');
+      el('whatsappPendingBtn').href = '#';
       return;
     }
     container.innerHTML = pending.map(unit => `<span class="pending-chip">${escapeHtml(unit.nome)}</span>`).join('');
     el('copyPendingBtn').disabled = false;
+    el('whatsappPendingBtn').classList.remove('disabled');
+    el('whatsappPendingBtn').removeAttribute('aria-disabled');
   }
 
   function renderAdminBetelSummary() {
@@ -669,17 +691,15 @@
     document.body.style.overflow = '';
   }
 
-  async function copyPendingMessage() {
+  function buildPendingMessage() {
     const data = state.admin.dashboard;
-    if (!data) return;
-    const pending = data.unidades.filter(unit => !unit.enviado).map(unit => unit.nome);
-    if (!pending.length) {
-      toast('Não há pedidos pendentes.');
-      return;
-    }
+    if (!data) return '';
+    const pending = data.unidades.filter(item => !item.enviado).map(item => item.nome);
+    if (!pending.length) return '';
+
     const periodo = `${ordinal(data.periodo.trimestre)} Trimestre de ${data.periodo.ano}`;
     const deadline = data.periodo.dataLimite ? ` O prazo é ${formatDate(data.periodo.dataLimite)}.` : '';
-    const message = [
+    return [
       '*PEDIDOS DE REVISTAS EBD*',
       '',
       `Prezados responsáveis pela EBD, ainda não identificamos o envio do pedido de revistas do ${periodo}.${deadline}`,
@@ -689,6 +709,14 @@
       '',
       'Pedimos a gentileza de realizar o pedido dentro do prazo estabelecido.'
     ].join('\n');
+  }
+
+  async function copyPendingMessage() {
+    const message = buildPendingMessage();
+    if (!message) {
+      toast('Não há pedidos pendentes.');
+      return;
+    }
 
     try {
       await copyText(message);
@@ -697,6 +725,16 @@
       console.error(error);
       toast('Não foi possível copiar a mensagem.', true);
     }
+  }
+
+  function preparePendingWhatsApp(event) {
+    const message = buildPendingMessage();
+    if (!message) {
+      event.preventDefault();
+      toast('Não há pedidos pendentes.');
+      return;
+    }
+    el('whatsappPendingBtn').href = `https://wa.me/?text=${encodeURIComponent(message)}`;
   }
 
   async function toggleOrdersStatus() {
