@@ -2370,3 +2370,106 @@ body::after {
   .splash-title { font-size: 1.33rem; }
   .splash-subtitle { font-size: .78rem; }
 }
+
+/* =========================================================
+   V2.6 — Histórico de trimestres
+   ========================================================= */
+.admin-history-card {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(220px, 320px);
+  gap: 22px;
+  align-items: center;
+  margin: 0 0 18px;
+  padding: 20px 22px;
+  border: 1px solid rgba(24, 146, 190, .16);
+  border-radius: 22px;
+  background:
+    radial-gradient(circle at 92% 12%, rgba(44, 205, 173, .18), transparent 26%),
+    radial-gradient(circle at 8% 90%, rgba(107, 84, 198, .12), transparent 28%),
+    linear-gradient(135deg, rgba(239, 249, 255, .98), rgba(242, 252, 248, .98));
+  box-shadow: 0 16px 36px rgba(20, 76, 110, .10);
+  overflow: hidden;
+}
+.admin-history-card::before {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 6px;
+  background: linear-gradient(180deg, #0d77b5, #12b8a9, #7356cc);
+}
+.admin-history-copy { position: relative; z-index: 1; }
+.admin-history-heading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 4px;
+}
+.admin-history-card h2 {
+  margin: 3px 0 5px;
+  color: #0a3d5c;
+  font-size: 1.28rem;
+  line-height: 1.15;
+}
+.admin-history-card p {
+  margin: 0;
+  color: #5a7483;
+  max-width: 680px;
+}
+.admin-history-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 26px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #dff7ee, #e6fbf5);
+  border: 1px solid #b7ead7;
+  color: #137550;
+  font-size: .72rem;
+  font-weight: 900;
+  letter-spacing: .025em;
+}
+.admin-history-badge.history {
+  background: linear-gradient(135deg, #f1edff, #e9f2ff);
+  border-color: #d8cff6;
+  color: #6649b9;
+}
+.admin-period-select-wrap {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  gap: 7px;
+  color: #385a6e;
+  font-size: .78rem;
+  font-weight: 850;
+}
+.admin-period-select-wrap select {
+  width: 100%;
+  min-height: 48px;
+  border: 1px solid #c8dfe9;
+  border-radius: 14px;
+  padding: 0 42px 0 14px;
+  background: rgba(255,255,255,.95);
+  color: #123d59;
+  font: inherit;
+  font-size: .92rem;
+  font-weight: 800;
+  box-shadow: 0 8px 20px rgba(32, 91, 123, .08);
+  cursor: pointer;
+}
+.admin-period-select-wrap select:focus {
+  outline: none;
+  border-color: #18a6ad;
+  box-shadow: 0 0 0 4px rgba(24, 166, 173, .12), 0 8px 20px rgba(32, 91, 123, .08);
+}
+
+@media (max-width: 760px) {
+  .admin-history-card {
+    grid-template-columns: 1fr;
+    gap: 14px;
+    padding: 18px 16px 18px 19px;
+    border-radius: 18px;
+  }
+  .admin-period-select-wrap { width: 100%; }
+}

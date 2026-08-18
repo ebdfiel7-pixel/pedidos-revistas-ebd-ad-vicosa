@@ -14,6 +14,7 @@
       token: readSessionToken(),
       dashboard: null,
       filter: 'all',
+      periodoSelecionado: '',
       returnView: 'appView',
       isBusy: false
     }
@@ -110,6 +111,12 @@
     el('backToOrdersBtn').addEventListener('click', () => window.location.reload());
     el('adminLoginForm').addEventListener('submit', adminLogin);
     el('adminRefreshBtn').addEventListener('click', loadAdminDashboard);
+    el('adminPeriodSelect').addEventListener('change', event => {
+      state.admin.periodoSelecionado = event.target.value;
+      state.admin.filter = 'all';
+      el('adminUnitFilter').value = 'all';
+      loadAdminDashboard();
+    });
     el('adminLogoutBtn').addEventListener('click', adminLogout);
     el('adminUnitFilter').addEventListener('change', event => {
       state.admin.filter = event.target.value;
@@ -542,7 +549,15 @@
 
     state.admin.isBusy = true;
     try {
-      const result = await jsonp('adminDashboard', { token: state.admin.token }, 12000);
+      const params = { token: state.admin.token };
+      if (state.admin.periodoSelecionado) {
+        const [ano, trimestre] = state.admin.periodoSelecionado.split('-').map(Number);
+        if (ano && trimestre) {
+          params.ano = ano;
+          params.trimestre = trimestre;
+        }
+      }
+      const result = await jsonp('adminDashboard', params, 12000);
       if (!result?.ok) {
         if (result?.code === 'ADMIN_SESSION_INVALID') {
           clearAdminToken();
@@ -553,6 +568,7 @@
       }
 
       state.admin.dashboard = result;
+      state.admin.periodoSelecionado = `${result.periodo.ano}-${result.periodo.trimestre}`;
       el('adminLoginPanel').classList.add('hidden');
       el('adminDashboardPanel').classList.remove('hidden');
       renderAdminDashboard();
@@ -571,6 +587,7 @@
     const p = data.periodo;
     const periodoLabel = `${ordinal(p.trimestre)} Trimestre de ${p.ano}`;
     el('adminPeriodLabel').textContent = periodoLabel;
+    renderAdminPeriodSelector();
     el('metricUnits').textContent = String(data.metricas.unidades);
     el('metricReceived').textContent = String(data.metricas.recebidos);
     el('metricPending').textContent = String(data.metricas.pendentes);
@@ -583,16 +600,46 @@
     el('adminProgressPercent').textContent = `${progresso}%`;
     el('adminProgressFill').style.width = `${Math.max(0, Math.min(100, progresso))}%`;
 
-    el('adminOpenStatus').textContent = p.pedidosAbertos ? 'Pedidos abertos' : 'Pedidos fechados';
-    el('adminDeadlineText').textContent = p.dataLimite
-      ? `Prazo configurado: ${formatDate(p.dataLimite)}`
-      : 'Nenhuma data-limite foi definida.';
-    el('toggleOrdersBtn').textContent = p.pedidosAbertos ? 'Fechar pedidos' : 'Abrir pedidos';
-    el('toggleOrdersBtn').dataset.nextOpen = p.pedidosAbertos ? 'false' : 'true';
+    if (p.atual) {
+      el('adminOpenStatus').textContent = p.pedidosAbertos ? 'Pedidos abertos' : 'Pedidos fechados';
+      el('adminDeadlineText').textContent = p.dataLimite
+        ? `Prazo configurado: ${formatDate(p.dataLimite)}`
+        : 'Nenhuma data-limite foi definida.';
+      el('toggleOrdersBtn').classList.remove('hidden');
+      el('toggleOrdersBtn').disabled = false;
+      el('toggleOrdersBtn').textContent = p.pedidosAbertos ? 'Fechar pedidos' : 'Abrir pedidos';
+      el('toggleOrdersBtn').dataset.nextOpen = p.pedidosAbertos ? 'false' : 'true';
+    } else {
+      el('adminOpenStatus').textContent = 'Consulta histórica';
+      el('adminDeadlineText').textContent = 'Este trimestre está em modo somente leitura. Os registros permanecem preservados.';
+      el('toggleOrdersBtn').classList.add('hidden');
+      el('toggleOrdersBtn').disabled = true;
+    }
 
     renderAdminUnitList();
     renderPendingList();
     renderAdminBetelSummary();
+  }
+
+
+  function renderAdminPeriodSelector() {
+    const data = state.admin.dashboard;
+    if (!data) return;
+    const select = el('adminPeriodSelect');
+    const periods = Array.isArray(data.periodosDisponiveis) ? data.periodosDisponiveis : [];
+    select.innerHTML = periods.map(item => {
+      const value = `${item.ano}-${item.trimestre}`;
+      const suffix = item.atual ? ' — atual' : '';
+      return `<option value="${escapeHtml(value)}">${escapeHtml(item.label + suffix)}</option>`;
+    }).join('');
+    select.value = `${data.periodo.ano}-${data.periodo.trimestre}`;
+
+    const badge = el('adminHistoryModeBadge');
+    badge.textContent = data.periodo.atual ? 'Período atual' : 'Histórico';
+    badge.classList.toggle('history', !data.periodo.atual);
+    el('adminHistoryHelp').textContent = data.periodo.atual
+      ? 'Você está acompanhando o trimestre em andamento. Períodos anteriores ficam preservados para consulta.'
+      : 'Consulta de um trimestre anterior. Nenhum dado histórico pode ser alterado por esta tela.';
   }
 
   function renderAdminUnitList() {
@@ -651,9 +698,16 @@
       return;
     }
     container.innerHTML = pending.map(unit => `<span class="pending-chip">${escapeHtml(unit.nome)}</span>`).join('');
-    el('copyPendingBtn').disabled = false;
-    el('whatsappPendingBtn').classList.remove('disabled');
-    el('whatsappPendingBtn').removeAttribute('aria-disabled');
+    if (data.periodo.atual) {
+      el('copyPendingBtn').disabled = false;
+      el('whatsappPendingBtn').classList.remove('disabled');
+      el('whatsappPendingBtn').removeAttribute('aria-disabled');
+    } else {
+      el('copyPendingBtn').disabled = true;
+      el('whatsappPendingBtn').classList.add('disabled');
+      el('whatsappPendingBtn').setAttribute('aria-disabled', 'true');
+      el('whatsappPendingBtn').href = '#';
+    }
   }
 
   function renderAdminBetelSummary() {
@@ -675,7 +729,13 @@
   async function openAdminOrder(unitId) {
     if (!state.admin.token) return;
     try {
-      const result = await jsonp('adminPedido', { token: state.admin.token, unidadeId: unitId }, 10000);
+      const p = state.admin.dashboard?.periodo;
+      const result = await jsonp('adminPedido', {
+        token: state.admin.token,
+        unidadeId: unitId,
+        ano: p?.ano,
+        trimestre: p?.trimestre
+      }, 10000);
       if (!result?.ok) {
         if (result?.code === 'ADMIN_SESSION_INVALID') {
           clearAdminToken();
@@ -686,7 +746,7 @@
       }
       const order = result.pedido;
       if (!order) {
-        toast('Esta Sede ou congregação ainda não possui pedido no período atual.', true);
+        toast('Esta Sede ou congregação não possui pedido no período selecionado.', true);
         return;
       }
 
@@ -695,6 +755,7 @@
         <div><span>Protocolo</span><strong>${escapeHtml(order.protocolo)}</strong></div>
         <div><span>Responsável</span><strong>${escapeHtml(order.responsavel || '—')}</strong></div>
         <div><span>Telefone</span><strong>${escapeHtml(order.telefone || '—')}</strong></div>
+        <div><span>Período</span><strong>${ordinal(order.trimestre)} Trimestre de ${order.ano}</strong></div>
         <div><span>Atualizado em</span><strong>${escapeHtml(formatDateTime(order.atualizadoEm))}</strong></div>`;
       el('adminOrderItems').innerHTML = order.itens.map(item => `
         <tr>
@@ -719,7 +780,7 @@
 
   function buildPendingMessage() {
     const data = state.admin.dashboard;
-    if (!data) return '';
+    if (!data || !data.periodo?.atual) return '';
     const pending = data.unidades.filter(item => !item.enviado).map(item => item.nome);
     if (!pending.length) return '';
 
@@ -765,7 +826,7 @@
 
   async function toggleOrdersStatus() {
     const data = state.admin.dashboard;
-    if (!data || state.admin.isBusy) return;
+    if (!data || state.admin.isBusy || !data.periodo?.atual) return;
     const nextOpen = el('toggleOrdersBtn').dataset.nextOpen === 'true';
     const verb = nextOpen ? 'abrir' : 'fechar';
     if (!window.confirm(`Deseja realmente ${verb} os pedidos do período atual?`)) return;
@@ -802,6 +863,7 @@
   function adminLogout() {
     clearAdminToken();
     state.admin.dashboard = null;
+    state.admin.periodoSelecionado = '';
     showAdminLogin();
     toast('Sessão administrativa encerrada.');
   }

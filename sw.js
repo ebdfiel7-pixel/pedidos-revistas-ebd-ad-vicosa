@@ -1,19 +1,19 @@
-const CACHE_NAME = 'pedidos-ebd-v2-5-1';
+const CACHE_NAME = 'pedidos-ebd-v2-6-0';
 const APP_SHELL = [
   './',
   './index.html',
-  './config.js?v=2.5.1',
-  './css/style.css?v=2.5.1',
-  './js/app.js?v=2.5.1',
-  './manifest.webmanifest?v=2.5.1',
-  './img/logo-ad-vicosa.png?v=2.5.1',
-  './img/app-logo-oficial.png?v=2.5.1',
-  './img/apple-touch-icon.png?v=2.5.1',
-  './img/icon-192.png?v=2.5.1',
-  './img/icon-512.png?v=2.5.1',
-  './img/icon-192-maskable.png?v=2.5.1',
-  './img/icon-512-maskable.png?v=2.5.1',
-  './img/favicon.png?v=2.5.1'
+  './config.js?v=2.6.0',
+  './css/style.css?v=2.6.0',
+  './js/app.js?v=2.6.0',
+  './manifest.webmanifest?v=2.6.0',
+  './img/logo-ad-vicosa.png?v=2.6.0',
+  './img/app-logo-oficial.png?v=2.6.0',
+  './img/apple-touch-icon.png?v=2.6.0',
+  './img/icon-192.png?v=2.6.0',
+  './img/icon-512.png?v=2.6.0',
+  './img/icon-192-maskable.png?v=2.6.0',
+  './img/icon-512-maskable.png?v=2.6.0',
+  './img/favicon.png?v=2.6.0'
 ];
 
 self.addEventListener('install', event => {

@@ -6,13 +6,13 @@
   <meta name="theme-color" content="#0b4f86">
   <meta name="description" content="Pedidos trimestrais de revistas da EBD - AD Viçosa">
   <title>Pedidos de Revistas EBD - AD Viçosa</title>
-  <link rel="icon" type="image/png" href="img/favicon.png?v=2.5.1">
-  <link rel="apple-touch-icon" href="img/apple-touch-icon.png?v=2.5.1">
+  <link rel="icon" type="image/png" href="img/favicon.png?v=2.6.0">
+  <link rel="apple-touch-icon" href="img/apple-touch-icon.png?v=2.6.0">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Pedidos EBD">
-  <link rel="manifest" href="manifest.webmanifest?v=2.5.1">
-  <link rel="stylesheet" href="css/style.css?v=2.5.1">
+  <link rel="manifest" href="manifest.webmanifest?v=2.6.0">
+  <link rel="stylesheet" href="css/style.css?v=2.6.0">
 </head>
 <body class="splash-active">
   <div id="splashScreen" class="splash-screen" role="presentation" aria-hidden="true">
@@ -22,7 +22,7 @@
     <div class="splash-content">
       <div class="splash-logo-stage">
         <span class="splash-logo-glow" aria-hidden="true"></span>
-        <img src="img/logo-ad-vicosa.png?v=2.5.1" alt="AD Viçosa Madureira" class="splash-brand-logo">
+        <img src="img/logo-ad-vicosa.png?v=2.6.0" alt="AD Viçosa Madureira" class="splash-brand-logo">
       </div>
       <div class="splash-kicker">Escola Bíblica Dominical • AD Viçosa</div>
       <div class="splash-title">Pedidos de Revistas EBD</div>
@@ -32,7 +32,7 @@
   </div>
   <header class="topbar">
     <div class="brand-wrap">
-      <img src="img/logo-ad-vicosa.png?v=2.5.1" alt="AD Viçosa Madureira" class="brand-logo">
+      <img src="img/logo-ad-vicosa.png?v=2.6.0" alt="AD Viçosa Madureira" class="brand-logo">
       <div class="brand-title">
         <strong>Pedidos de Revistas EBD</strong>
       </div>
@@ -234,6 +234,21 @@
           </div>
         </div>
 
+        <section class="admin-history-card" aria-label="Histórico de trimestres">
+          <div class="admin-history-copy">
+            <div class="admin-history-heading">
+              <span class="eyebrow">Histórico</span>
+              <span id="adminHistoryModeBadge" class="admin-history-badge">Período atual</span>
+            </div>
+            <h2>Consultar trimestre</h2>
+            <p id="adminHistoryHelp">Selecione um período para consultar pedidos anteriores sem alterar os registros.</p>
+          </div>
+          <label class="admin-period-select-wrap">
+            <span>Período</span>
+            <select id="adminPeriodSelect" aria-label="Selecionar trimestre para consulta"></select>
+          </label>
+        </section>
+
         <div class="admin-metrics">
           <article class="metric-card">
             <span>Sede + Congregações</span>
@@ -363,7 +378,7 @@
 
   <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
 
-  <script src="config.js?v=2.5.1"></script>
-  <script src="js/app.js?v=2.5.1"></script>
+  <script src="config.js?v=2.6.0"></script>
+  <script src="js/app.js?v=2.6.0"></script>
 </body>
 </html>
