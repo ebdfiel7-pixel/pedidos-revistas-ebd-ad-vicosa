@@ -150,6 +150,10 @@
     el('adminSavePricesBtn').addEventListener('click', saveAdminPrices);
     el('adminResetPricesBtn').addEventListener('click', () => { state.admin.pricesDirty = false; renderAdminPricesEditor(); });
     el('adminPricesBody').addEventListener('input', handleAdminPriceInput);
+    el('adminPricesBody').addEventListener('focusin', event => {
+      if (!event.target.matches('.admin-price-input')) return;
+      window.setTimeout(() => event.target.select(), 0);
+    });
     el('adminSaveDeadlineBtn').addEventListener('click', saveAdminDeadline);
     el('adminStartNextPeriodBtn').addEventListener('click', startAdminNextPeriod);
     $all('[data-admin-jump]').forEach(button => {
@@ -754,7 +758,7 @@
     const status = el('adminPricesEditorStatus');
 
     body.innerHTML = prices.map(item => {
-      const value = item.valor == null ? '' : Number(item.valor).toFixed(2).replace('.', ',');
+      const value = item.valor == null ? '' : formatAdminPriceFromCents(Math.round(Number(item.valor) * 100));
       return `
         <tr>
           <td data-label="Produto"><strong>${escapeHtml(item.produto)}</strong></td>
@@ -763,7 +767,7 @@
           <td data-label="Valor unitário">
             <div class="price-input-wrap">
               <span>R$</span>
-              <input class="admin-price-input" type="text" inputmode="decimal" autocomplete="off"
+              <input class="admin-price-input" type="text" inputmode="numeric" pattern="[0-9]*" autocomplete="off"
                 data-price-id="${escapeHtml(item.id)}" value="${escapeHtml(value)}" placeholder="0,00" ${isCurrent ? '' : 'disabled'}>
             </div>
           </td>
@@ -787,12 +791,32 @@
 
   function handleAdminPriceInput(event) {
     if (!event.target.matches('.admin-price-input')) return;
-    event.target.classList.remove('invalid');
+    const input = event.target;
+    const digits = String(input.value || '').replace(/\D/g, '');
+
+    if (!digits) {
+      input.value = '';
+    } else {
+      // Máscara monetária por centavos: 1550 -> 15,50.
+      // Assim o superintendente digita somente números, sem vírgula ou ponto.
+      const cents = Number(digits.slice(0, 11));
+      input.value = formatAdminPriceFromCents(Number.isFinite(cents) ? cents : 0);
+      window.requestAnimationFrame(() => {
+        try { input.setSelectionRange(input.value.length, input.value.length); } catch (_) {}
+      });
+    }
+
+    input.classList.remove('invalid');
     state.admin.pricesDirty = true;
     el('adminPricesEditorStatus').textContent = 'Alterações não salvas';
     el('adminPricesEditorStatus').className = 'price-status-chip pending';
     el('adminSavePricesBtn').disabled = false;
     el('adminResetPricesBtn').disabled = false;
+  }
+
+  function formatAdminPriceFromCents(cents) {
+    const safeCents = Math.max(0, Math.trunc(Number(cents) || 0));
+    return (safeCents / 100).toFixed(2).replace('.', ',');
   }
 
   function parseAdminPrice(value) {
