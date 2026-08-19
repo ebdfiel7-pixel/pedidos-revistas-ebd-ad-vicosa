@@ -10,6 +10,7 @@
     currentStep: 1,
     existingOrder: null,
     isSubmitting: false,
+    lastSubmittedOrder: null,
     admin: {
       token: readSessionToken(),
       dashboard: null,
@@ -99,6 +100,7 @@
     });
 
     el('submitBtn').addEventListener('click', submitOrder);
+    el('sharePdfBtn').addEventListener('click', shareLastOrderPdf);
     el('newOrderBtn').addEventListener('click', resetApp);
     el('unitSelect').addEventListener('change', loadExistingOrder);
     el('phoneInput').addEventListener('input', event => {
@@ -245,6 +247,7 @@
   async function loadExistingOrder() {
     const unitId = el('unitSelect').value;
     state.existingOrder = null;
+    state.lastSubmittedOrder = null;
     el('existingOrderBanner').classList.add('hidden');
 
     if (!unitId || !state.boot) return;
@@ -437,7 +440,7 @@
       .join('');
     el('successOrderTotal').textContent = String(total);
 
-    const mensagem = buildWhatsAppMessage({
+    state.lastSubmittedOrder = {
       protocolo,
       unidade,
       periodo,
@@ -445,8 +448,7 @@
       telefone,
       itens,
       total
-    });
-    el('whatsappBtn').href = `https://wa.me/${SUPERINTENDENCIA_WHATSAPP}?text=${encodeURIComponent(mensagem)}`;
+    };
 
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
@@ -461,28 +463,276 @@
       .filter(item => item.quantidade > 0);
   }
 
-  function buildWhatsAppMessage({ protocolo, unidade, periodo, responsavel, telefone, itens, total }) {
-    const linhasItens = itens.map(item => `${item.quantidade}x ${item.nome}`).join('\n');
+  function buildOrderShareMessage({ protocolo, unidade, periodo, responsavel }) {
+    const local = String(unidade || '').trim().toLowerCase() === 'sede'
+      ? 'da Sede'
+      : `da Congregação ${unidade}`;
     return [
-      '*PEDIDO DE REVISTAS EBD*',
+      'A Paz do Senhor!',
       '',
-      `Sede / Congregação: ${unidade}`,
-      `Protocolo: ${protocolo}`,
-      `Período: ${periodo}`,
+      `Segue o pedido das revistas do ${periodo} ${local}.`,
       `Responsável: ${responsavel}`,
-      `Telefone: ${telefone}`,
+      `Protocolo: ${protocolo}`,
       '',
-      '*Itens solicitados:*',
-      linhasItens,
-      '',
-      `*Total: ${total} exemplares*`,
-      '',
-      'Pedido registrado pelo aplicativo Pedidos de Revistas EBD - AD Viçosa.'
+      'O pedido completo segue em PDF anexo.'
     ].join('\n');
+  }
+
+  async function shareLastOrderPdf() {
+    const order = state.lastSubmittedOrder;
+    if (!order) {
+      toast('Não foi possível localizar os dados do pedido para gerar o PDF.', true);
+      return;
+    }
+
+    const button = el('sharePdfBtn');
+    const originalText = button.textContent;
+    button.disabled = true;
+    button.textContent = 'Gerando PDF...';
+
+    try {
+      const blob = await generateOrderPdf(order);
+      const filename = buildOrderPdfFilename(order);
+      const file = new File([blob], filename, { type: 'application/pdf' });
+      const text = buildOrderShareMessage(order);
+
+      if (navigator.share && navigator.canShare?.({ files: [file] })) {
+        await navigator.share({
+          title: `Pedido de Revistas EBD - ${order.unidade}`,
+          text,
+          files: [file]
+        });
+        return;
+      }
+
+      downloadBlob(blob, filename);
+      const whatsappUrl = `https://wa.me/${SUPERINTENDENCIA_WHATSAPP}?text=${encodeURIComponent(text)}`;
+      window.open(whatsappUrl, '_blank', 'noopener,noreferrer');
+      toast('O PDF foi baixado. No WhatsApp, anexe o arquivo baixado à mensagem aberta.');
+    } catch (error) {
+      if (error?.name === 'AbortError') return;
+      console.error(error);
+      toast('Não foi possível gerar ou compartilhar o PDF. Tente novamente.', true);
+    } finally {
+      button.disabled = false;
+      button.textContent = originalText;
+    }
+  }
+
+  async function generateOrderPdf(order) {
+    if (!window.jspdf?.jsPDF) {
+      throw new Error('Biblioteca de PDF não carregada.');
+    }
+
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4', compress: true });
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
+    const margin = 15;
+    const contentWidth = pageWidth - (margin * 2);
+    const navy = [10, 52, 91];
+    const blue = [15, 101, 168];
+    const cyan = [16, 176, 200];
+    const ink = [22, 43, 63];
+    const muted = [91, 112, 131];
+    const line = [220, 231, 239];
+    const soft = [244, 249, 252];
+
+    // Cabeçalho institucional
+    doc.setFillColor(...navy);
+    doc.rect(0, 0, pageWidth, 47, 'F');
+    doc.setFillColor(...cyan);
+    doc.rect(0, 44, pageWidth, 3, 'F');
+
+    try {
+      const logo = await loadImageDataUrl('img/icon-512.png?v=2.8.0');
+      doc.setFillColor(255, 255, 255);
+      doc.roundedRect(margin, 9, 28, 28, 3, 3, 'F');
+      doc.addImage(logo, 'PNG', margin + 1.5, 10.5, 25, 25, undefined, 'FAST');
+    } catch (error) {
+      try {
+        const logo = await loadImageDataUrl('img/logo-ad-vicosa.png?v=2.8.0');
+        doc.addImage(logo, 'PNG', margin, 15, 55, 16, undefined, 'FAST');
+      } catch (_) {
+        // O PDF continua funcional mesmo se a imagem não puder ser carregada.
+      }
+    }
+
+    doc.setTextColor(255, 255, 255);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(18);
+    doc.text('PEDIDO DE REVISTAS EBD', 49, 18);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(10.5);
+    doc.text('AD Viçosa Madureira • Superintendência da Escola Bíblica Dominical', 49, 25);
+    doc.setFontSize(9.5);
+    doc.text('Documento de pedido • sem valores financeiros', 49, 31.5);
+
+    // Identificação do pedido
+    let y = 58;
+    doc.setTextColor(...ink);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(14);
+    doc.text('Identificação do pedido', margin, y);
+    y += 5;
+
+    doc.setFillColor(...soft);
+    doc.setDrawColor(...line);
+    doc.roundedRect(margin, y, contentWidth, 37, 3, 3, 'FD');
+
+    const leftX = margin + 6;
+    const rightX = margin + 98;
+    const topY = y + 8;
+    pdfLabelValue(doc, 'Sede / Congregação', order.unidade, leftX, topY, ink, muted, 78);
+    pdfLabelValue(doc, 'Período', order.periodo, rightX, topY, ink, muted, 74);
+    pdfLabelValue(doc, 'Responsável', order.responsavel, leftX, topY + 14, ink, muted, 78);
+    pdfLabelValue(doc, 'Protocolo', order.protocolo, rightX, topY + 14, ink, muted, 74);
+    y += 47;
+
+    // Tabela de itens
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(14);
+    doc.setTextColor(...ink);
+    doc.text('Revistas e materiais solicitados', margin, y);
+    y += 6;
+
+    const tableX = margin;
+    const tableW = contentWidth;
+    const qtyW = 30;
+    const nameW = tableW - qtyW;
+    const rowH = 8;
+
+    const drawTableHeader = () => {
+      doc.setFillColor(...blue);
+      doc.roundedRect(tableX, y, tableW, rowH, 2, 2, 'F');
+      doc.setTextColor(255, 255, 255);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(9.5);
+      doc.text('Revista / material', tableX + 4, y + 5.4);
+      doc.text('Quantidade', tableX + nameW + (qtyW / 2), y + 5.4, { align: 'center' });
+      y += rowH;
+    };
+
+    drawTableHeader();
+
+    order.itens.forEach((item, index) => {
+      const wrapped = doc.splitTextToSize(String(item.nome || ''), nameW - 8);
+      const actualRowH = Math.max(rowH, wrapped.length * 4.2 + 3.5);
+      if (y + actualRowH + 24 > pageHeight) {
+        addPdfFooter(doc, pageWidth, pageHeight, order.protocolo, navy, muted);
+        doc.addPage();
+        y = 18;
+        drawTableHeader();
+      }
+
+      if (index % 2 === 0) {
+        doc.setFillColor(248, 251, 253);
+        doc.rect(tableX, y, tableW, actualRowH, 'F');
+      }
+      doc.setDrawColor(...line);
+      doc.line(tableX, y + actualRowH, tableX + tableW, y + actualRowH);
+      doc.line(tableX + nameW, y, tableX + nameW, y + actualRowH);
+
+      doc.setTextColor(...ink);
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(9.2);
+      doc.text(wrapped, tableX + 4, y + 5.2);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(10.5);
+      doc.text(String(item.quantidade), tableX + nameW + (qtyW / 2), y + 5.5, { align: 'center' });
+      y += actualRowH;
+    });
+
+    // Total
+    if (y + 23 > pageHeight) {
+      addPdfFooter(doc, pageWidth, pageHeight, order.protocolo, navy, muted);
+      doc.addPage();
+      y = 18;
+    }
+    y += 6;
+    doc.setFillColor(...navy);
+    doc.roundedRect(margin, y, contentWidth, 16, 3, 3, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(10.5);
+    doc.text('TOTAL DE EXEMPLARES', margin + 6, y + 10.2);
+    doc.setFontSize(15);
+    doc.text(String(order.total), pageWidth - margin - 7, y + 10.5, { align: 'right' });
+
+    addPdfFooter(doc, pageWidth, pageHeight, order.protocolo, navy, muted);
+    doc.setProperties({
+      title: `Pedido de Revistas EBD - ${order.unidade}`,
+      subject: `${order.periodo} - ${order.protocolo}`,
+      author: 'AD Viçosa Madureira - EBD',
+      creator: 'Pedidos de Revistas EBD - AD Viçosa'
+    });
+
+    return doc.output('blob');
+  }
+
+  function pdfLabelValue(doc, label, value, x, y, ink, muted, maxWidth) {
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(7.5);
+    doc.setTextColor(...muted);
+    doc.text(String(label).toUpperCase(), x, y);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(10.2);
+    doc.setTextColor(...ink);
+    const text = doc.splitTextToSize(String(value || '—'), maxWidth);
+    doc.text(text.slice(0, 2), x, y + 5.3);
+  }
+
+  function addPdfFooter(doc, pageWidth, pageHeight, protocolo, navy, muted) {
+    const footerY = pageHeight - 10;
+    doc.setDrawColor(220, 231, 239);
+    doc.line(15, footerY - 4, pageWidth - 15, footerY - 4);
+    doc.setTextColor(...muted);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7.5);
+    doc.text('Pedidos de Revistas EBD - AD Viçosa', 15, footerY);
+    doc.text(`Protocolo: ${protocolo}`, pageWidth - 15, footerY, { align: 'right' });
+    doc.setTextColor(...navy);
+  }
+
+  async function loadImageDataUrl(src) {
+    const response = await fetch(src, { cache: 'force-cache' });
+    if (!response.ok) throw new Error(`Não foi possível carregar a imagem: ${src}`);
+    const blob = await response.blob();
+    return blobToDataUrl(blob);
+  }
+
+  function blobToDataUrl(blob) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+  }
+
+  function buildOrderPdfFilename(order) {
+    const cleanUnit = String(order.unidade || 'Congregacao')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-zA-Z0-9]+/g, '_')
+      .replace(/^_+|_+$/g, '');
+    return `Pedido_Revistas_EBD_${cleanUnit}_${order.protocolo}.pdf`;
+  }
+
+  function downloadBlob(blob, filename) {
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 2000);
   }
 
   function resetApp() {
     state.existingOrder = null;
+    state.lastSubmittedOrder = null;
     Object.keys(state.quantities).forEach(id => { state.quantities[id] = 0; });
     syncQuantityInputs();
     el('unitSelect').value = '';

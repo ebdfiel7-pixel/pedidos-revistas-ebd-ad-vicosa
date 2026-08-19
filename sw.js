@@ -1,10 +1,10 @@
-const CACHE_NAME = 'pedidos-ebd-v2-8-1';
+const CACHE_NAME = 'pedidos-ebd-v2-9-0';
 const APP_SHELL = [
   './',
   './index.html',
   './config.js?v=2.8.0',
   './css/style.css?v=2.8.0',
-  './js/app.js?v=2.8.1',
+  './js/app.js?v=2.9.0',
   './manifest.webmanifest?v=2.8.0',
   './img/logo-ad-vicosa.png?v=2.8.0',
   './img/app-logo-oficial.png?v=2.8.0',
