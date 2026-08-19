@@ -2714,3 +2714,67 @@ body::after {
   }
   .price-input-wrap { width: 100%; grid-template-columns: auto 1fr; }
 }
+
+
+/* V2.9.2 — fluxo público mais discreto e retorno fácil ao início */
+.brand-home {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  text-align: left;
+  color: inherit;
+  cursor: pointer;
+}
+.brand-home:focus-visible {
+  outline: 3px solid rgba(255,255,255,.72);
+  outline-offset: -3px;
+  border-radius: 14px;
+}
+
+.edit-order-shortcut {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  margin: -5px 0 18px;
+  color: #6d8290;
+  font-size: .84rem;
+}
+.edit-order-link,
+.workflow-home-link {
+  border: 0;
+  background: transparent;
+  color: #17638f;
+  padding: 4px 2px;
+  font: inherit;
+  font-weight: 800;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+}
+.edit-order-link:hover,
+.workflow-home-link:hover { color: #0b4f86; }
+.edit-order-link:focus-visible,
+.workflow-home-link:focus-visible {
+  outline: 2px solid #49a6c8;
+  outline-offset: 3px;
+  border-radius: 5px;
+}
+
+.workflow-home-row {
+  display: flex;
+  justify-content: flex-start;
+  margin-top: 14px;
+}
+.workflow-home-link {
+  color: #607987;
+  font-size: .86rem;
+  text-decoration: none;
+}
+.workflow-home-link:hover { color: #174f70; text-decoration: underline; }
+.compact-notice { padding: 10px 13px; margin-bottom: 16px; font-size: .86rem; }
+
+@media (max-width: 720px) {
+  .edit-order-shortcut { justify-content: flex-start; margin-top: -2px; }
+  .workflow-home-row { margin-top: 10px; }
+}

@@ -87,10 +87,7 @@
   }
 
   function bindEvents() {
-    el('goProductsBtn').addEventListener('click', () => {
-      if (!validateIdentification()) return;
-      goToStep(2);
-    });
+    el('goProductsBtn').addEventListener('click', continueFromIdentification);
 
     el('goReviewBtn').addEventListener('click', () => {
       if (getTotal() <= 0) {
@@ -103,7 +100,9 @@
 
     el('submitBtn').addEventListener('click', submitOrder);
     el('sharePdfBtn').addEventListener('click', shareLastOrderPdf);
-    el('newOrderBtn').addEventListener('click', resetApp);
+    el('newOrderBtn').addEventListener('click', () => returnToHome({ skipConfirm: true }));
+    el('homeLogoBtn').addEventListener('click', returnToHome);
+    $all('[data-home]').forEach(button => button.addEventListener('click', returnToHome));
     el('openEditOrderBtn').addEventListener('click', openEditOrderPanel);
     el('cancelEditOrderBtn').addEventListener('click', cancelEditOrder);
     el('findEditOrderBtn').addEventListener('click', findOrderByProtocol);
@@ -116,7 +115,7 @@
         findOrderByProtocol();
       }
     });
-    el('unitSelect').addEventListener('change', checkExistingOrderForUnit);
+    el('unitSelect').addEventListener('change', () => checkExistingOrderForUnit());
     el('phoneInput').addEventListener('input', event => {
       event.target.value = formatPhone(event.target.value);
     });
@@ -284,25 +283,52 @@
   }
 
   async function checkExistingOrderForUnit() {
-    if (state.editProtocol || !state.boot) return;
+    if (state.editProtocol || !state.boot) return false;
     const unitId = el('unitSelect').value;
     state.unitHasExistingOrder = false;
-    el('existingOrderBanner').classList.add('hidden');
-    if (!unitId) return;
+    if (!unitId) return false;
+
     try {
       const response = await jsonp('pedidoExiste', {
         unidadeId: unitId,
         ano: state.boot.configuracao.ano,
         trimestre: state.boot.configuracao.trimestre
       });
-      if (response?.ok && response?.existe) {
-        state.unitHasExistingOrder = true;
-        el('existingOrderTitle').textContent = 'Já existe um pedido desta Sede / congregação.';
-        el('existingOrderText').textContent = 'Para corrigir o pedido existente, use “Alterar pedido já enviado” e informe o número do protocolo.';
-        el('existingOrderBanner').classList.remove('hidden');
-      }
+      state.unitHasExistingOrder = Boolean(response?.ok && response?.existe);
+      return state.unitHasExistingOrder;
     } catch (error) {
       console.warn('Não foi possível verificar pedido existente:', error);
+      return false;
+    }
+  }
+
+  async function continueFromIdentification() {
+    if (!validateIdentification()) return;
+
+    if (!state.editProtocol) {
+      const exists = await checkExistingOrderForUnit();
+      if (exists) {
+        offerExistingOrderCorrection();
+        return;
+      }
+    }
+
+    goToStep(2);
+  }
+
+  function offerExistingOrderCorrection() {
+    const unit = state.boot?.unidades?.find(item => item.id === el('unitSelect').value);
+    const unitName = unit?.nome || 'esta Sede / congregação';
+    const wantsCorrection = window.confirm(
+      `Já existe um pedido enviado para ${unitName} neste trimestre.\n\nDeseja corrigir o pedido existente?`
+    );
+
+    if (wantsCorrection) {
+      goToStep(1);
+      openEditOrderPanel();
+      toast('Informe o número do protocolo do pedido para fazer a correção.');
+    } else {
+      toast('O pedido existente foi mantido. Nenhum novo pedido foi criado.');
     }
   }
 
@@ -403,11 +429,6 @@
       el('unitSelect').focus();
       return false;
     }
-    if (state.unitHasExistingOrder && !state.editProtocol) {
-      toast('Já existe um pedido desta Sede / congregação. Para corrigir, use o número do protocolo.', true);
-      openEditOrderPanel();
-      return false;
-    }
     if (responsible.length < 3) {
       toast('Informe o nome do responsável pelo pedido.', true);
       el('responsibleInput').focus();
@@ -444,6 +465,14 @@
   async function submitOrder() {
     if (state.isSubmitting) return;
     if (!validateIdentification() || getTotal() <= 0) return;
+
+    if (!state.editProtocol) {
+      const exists = await checkExistingOrderForUnit();
+      if (exists) {
+        offerExistingOrderCorrection();
+        return;
+      }
+    }
 
     state.isSubmitting = true;
     const button = el('submitBtn');
@@ -483,7 +512,13 @@
       showSuccess(confirmation);
     } catch (error) {
       console.error(error);
-      toast('Não foi possível confirmar o envio. Verifique sua internet e tente novamente.', true);
+      const message = String(error?.message || '');
+      if (/já existe um pedido/i.test(message)) {
+        state.unitHasExistingOrder = true;
+        offerExistingOrderCorrection();
+      } else {
+        toast(message || 'Não foi possível confirmar o envio. Verifique sua internet e tente novamente.', true);
+      }
     } finally {
       state.isSubmitting = false;
       button.disabled = false;
@@ -826,6 +861,44 @@
     link.click();
     link.remove();
     window.setTimeout(() => URL.revokeObjectURL(url), 2000);
+  }
+
+  function hasPublicDraft() {
+    if (!state.boot) return false;
+    return Boolean(
+      state.currentStep > 1 ||
+      state.editProtocol ||
+      state.lastSubmittedOrder ||
+      el('unitSelect')?.value ||
+      el('responsibleInput')?.value?.trim() ||
+      el('phoneInput')?.value?.trim() ||
+      getTotal() > 0 ||
+      !el('editOrderPanel')?.classList.contains('hidden')
+    );
+  }
+
+  function returnToHome(options = {}) {
+    const skipConfirm = Boolean(options && options.skipConfirm);
+    const adminVisible = !el('adminView')?.classList.contains('hidden');
+
+    if (!skipConfirm && state.admin.pricesDirty) {
+      const discardPrices = window.confirm('Existem alterações de preços não salvas. Deseja descartá-las e voltar ao início?');
+      if (!discardPrices) return;
+      state.admin.pricesDirty = false;
+    } else if (!skipConfirm && !adminVisible && hasPublicDraft() && !state.lastSubmittedOrder) {
+      const discardDraft = window.confirm('Voltar ao início? Os dados ainda não enviados serão descartados.');
+      if (!discardDraft) return;
+    }
+
+    closeAdminOrderModal();
+    if (!state.boot || !state.boot.configuracao?.pedidosAbertos) {
+      window.location.reload();
+      return;
+    }
+
+    showOnly('appView');
+    resetApp();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
   function resetApp() {

@@ -29,7 +29,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Pedidos EBD">
   <link rel="manifest" href="manifest.webmanifest?v=2.8.0">
-  <link rel="stylesheet" href="css/style.css?v=2.8.0">
+  <link rel="stylesheet" href="css/style.css?v=2.9.2">
 </head>
 <body class="splash-active">
   <div id="splashScreen" class="splash-screen" role="presentation" aria-hidden="true">
@@ -48,12 +48,12 @@
     </div>
   </div>
   <header class="topbar">
-    <div class="brand-wrap">
+    <button id="homeLogoBtn" class="brand-wrap brand-home" type="button" aria-label="Voltar ao início">
       <img src="img/logo-ad-vicosa.png?v=2.8.0" alt="AD Viçosa Madureira" class="brand-logo">
       <div class="brand-title">
         <strong>Pedidos de Revistas EBD</strong>
       </div>
-    </div>
+    </button>
   </header>
 
   <main class="app-shell">
@@ -109,12 +109,9 @@
           <p>Selecione a Sede ou sua congregação e informe o responsável pelo pedido.</p>
         </div>
 
-        <div class="notice info">
-          <strong>Já enviou e precisa corrigir?</strong>
-          <span>Use somente o número do protocolo para localizar e alterar o pedido.</span>
-          <div class="actions right" style="margin-top:10px">
-            <button id="openEditOrderBtn" class="btn secondary compact" type="button">Alterar pedido já enviado</button>
-          </div>
+        <div class="edit-order-shortcut" aria-label="Correção de pedido já enviado">
+          <span>Já enviou um pedido?</span>
+          <button id="openEditOrderBtn" class="edit-order-link" type="button">Corrigir pedido</button>
         </div>
 
         <div id="editOrderPanel" class="notice info hidden" aria-live="polite">
@@ -126,13 +123,16 @@
               <input id="editProtocolInput" type="text" maxlength="40" autocomplete="off" autocapitalize="characters" placeholder="PED-2026-T4-001">
             </label>
           </div>
-          <div class="actions split">
+          <div class="workflow-home-row">
+            <button class="workflow-home-link" type="button" data-home>← Voltar ao início</button>
+          </div>
+          <div class="actions split edit-order-actions">
             <button id="cancelEditOrderBtn" class="btn secondary" type="button">Cancelar</button>
             <button id="findEditOrderBtn" class="btn primary" type="button">Localizar pedido</button>
           </div>
         </div>
 
-        <div id="existingOrderBanner" class="notice info hidden">
+        <div id="existingOrderBanner" class="notice info compact-notice hidden">
           <strong id="existingOrderTitle">Pedido localizado.</strong>
           <span id="existingOrderText">As quantidades foram carregadas para edição.</span>
         </div>
@@ -176,6 +176,9 @@
 
         <div id="catalogContainer" class="catalog"></div>
 
+        <div class="workflow-home-row">
+          <button class="workflow-home-link" type="button" data-home>← Voltar ao início</button>
+        </div>
         <div class="actions split sticky-actions">
           <button class="btn secondary" type="button" data-back="1">Voltar</button>
           <button id="goReviewBtn" class="btn primary" type="button">Conferir pedido</button>
@@ -205,9 +208,12 @@
         </div>
 
         <div class="notice warning-soft">
-          Ao confirmar, este pedido será registrado na planilha da Superintendência da EBD. Caso já exista um pedido da mesma Sede ou congregação no trimestre, ele será atualizado.
+          Ao confirmar, este pedido será registrado na planilha da Superintendência da EBD. Pedidos já existentes só podem ser corrigidos pelo número do protocolo.
         </div>
 
+        <div class="workflow-home-row">
+          <button class="workflow-home-link" type="button" data-home>← Voltar ao início</button>
+        </div>
         <div class="actions split">
           <button class="btn secondary" type="button" data-back="2">Voltar e corrigir</button>
           <button id="submitBtn" class="btn primary success" type="button">Confirmar pedido</button>
@@ -528,6 +534,6 @@
 
   <script src="config.js?v=2.8.0"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/4.2.1/jspdf.umd.min.js" integrity="sha512-+EeCylkt9WHJk5tGJxYdecHOcXFRME7qnbsfeMsdQL6NUPYm2+uGFmyleEqsmVoap/f3dN/sc3BX9t9kHXkHHg==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
-  <script src="js/app.js?v=2.9.1"></script>
+  <script src="js/app.js?v=2.9.2"></script>
 </body>
 </html>
