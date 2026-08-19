@@ -16,6 +16,7 @@
       filter: 'all',
       periodoSelecionado: '',
       returnView: 'appView',
+      currentOrder: null,
       isBusy: false
     }
   };
@@ -133,6 +134,9 @@
     el('adminOrderModal').addEventListener('click', event => {
       if (event.target === el('adminOrderModal')) closeAdminOrderModal();
     });
+    el('adminConfirmFinancialBtn').addEventListener('click', confirmAdminOrderFinancial);
+    el('adminOrderWhatsappBtn').addEventListener('click', prepareOrderFinancialWhatsApp);
+    el('adminMarkSentBtn').addEventListener('click', markAdminOrderSent);
   }
 
   function renderBoot() {
@@ -592,6 +596,8 @@
     el('metricReceived').textContent = String(data.metricas.recebidos);
     el('metricPending').textContent = String(data.metricas.pendentes);
     el('metricCopies').textContent = String(data.metricas.exemplares);
+    el('metricChecked').textContent = String(data.metricas.conferidos || 0);
+    el('metricFinancial').textContent = formatCurrency(data.metricas.valorConferido || 0);
 
     const totalCadastros = Number(data.metricas.unidades || 0);
     const recebidos = Number(data.metricas.recebidos || 0);
@@ -618,6 +624,7 @@
 
     renderAdminUnitList();
     renderPendingList();
+    renderAdminFinancialSummary();
     renderAdminBetelSummary();
   }
 
@@ -663,6 +670,7 @@
              <span><b>Responsável:</b> ${escapeHtml(item.responsavel || '—')}</span>
              <span><b>Telefone:</b> ${escapeHtml(item.telefone || '—')}</span>
              <span><b>Protocolo:</b> ${escapeHtml(item.protocolo || '—')}</span>
+             <span><b>Financeiro:</b> ${escapeHtml(item.situacaoFinanceira || 'A CONFERIR')}</span>
              <span><b>Atualizado:</b> ${escapeHtml(formatDateTime(item.atualizadoEm))}</span>
            </div>`
         : '<div class="admin-unit-details pending-text"><span>Nenhum pedido registrado neste trimestre.</span></div>';
@@ -675,6 +683,7 @@
         <div class="admin-unit-side">
           ${tag}
           <span class="admin-unit-total">${item.enviado ? `${Number(item.total || 0)} exemplares` : '—'}</span>
+          ${item.enviado && Number(item.valorTotal || 0) > 0 ? `<span class="admin-unit-value">${formatCurrency(item.valorTotal)}</span>` : ''}
           ${item.enviado ? '<span class="admin-unit-open">Ver pedido →</span>' : ''}
         </div>`;
 
@@ -708,6 +717,46 @@
       el('whatsappPendingBtn').setAttribute('aria-disabled', 'true');
       el('whatsappPendingBtn').href = '#';
     }
+  }
+
+
+  function renderAdminFinancialSummary() {
+    const data = state.admin.dashboard;
+    if (!data) return;
+    const financeiro = data.financeiro || { linhas: [], precosCadastrados: 0, totalProdutos: 0, totalCalculado: 0, totalConferido: 0 };
+    const cadastrados = Number(financeiro.precosCadastrados || 0);
+    const totalProdutos = Number(financeiro.totalProdutos || 0);
+    const completos = totalProdutos > 0 && cadastrados === totalProdutos;
+
+    const statusChip = el('adminPriceStatus');
+    if (data.periodo?.atual) {
+      statusChip.textContent = totalProdutos
+        ? `${cadastrados}/${totalProdutos} preços cadastrados`
+        : 'Preços não preparados';
+      statusChip.classList.toggle('complete', completos);
+      statusChip.classList.toggle('pending', !completos);
+      el('adminFinanceHelp').innerHTML = 'Preencha os valores unitários na aba <strong>PRECOS_TRIMESTRE</strong> da Planilha Google. Depois confira cada pedido para gerar o demonstrativo.';
+    } else {
+      statusChip.textContent = 'Histórico — somente leitura';
+      statusChip.classList.add('complete');
+      statusChip.classList.remove('pending');
+      el('adminFinanceHelp').textContent = 'Valores e situações preservados do trimestre selecionado.';
+    }
+
+    el('adminFinanceBody').innerHTML = (financeiro.linhas || []).map(item => {
+      const situacao = String(item.situacao || '—');
+      const cls = financialStatusClass(situacao);
+      return `
+        <tr>
+          <td>${escapeHtml(item.nome)}</td>
+          <td>${Number(item.exemplares || 0) || '—'}</td>
+          <td>${item.valor == null ? '—' : formatCurrency(item.valor)}</td>
+          <td><span class="finance-status ${cls}">${escapeHtml(situacao)}</span></td>
+        </tr>`;
+    }).join('');
+
+    el('adminFinancialCalculated').textContent = formatCurrency(financeiro.totalCalculado || 0);
+    el('adminFinancialConfirmed').textContent = formatCurrency(financeiro.totalConferido || 0);
   }
 
   function renderAdminBetelSummary() {
@@ -750,20 +799,26 @@
         return;
       }
 
+      state.admin.currentOrder = order;
       el('adminOrderModalTitle').textContent = order.unidade;
       el('adminOrderMeta').innerHTML = `
         <div><span>Protocolo</span><strong>${escapeHtml(order.protocolo)}</strong></div>
         <div><span>Responsável</span><strong>${escapeHtml(order.responsavel || '—')}</strong></div>
         <div><span>Telefone</span><strong>${escapeHtml(order.telefone || '—')}</strong></div>
         <div><span>Período</span><strong>${ordinal(order.trimestre)} Trimestre de ${order.ano}</strong></div>
+        <div><span>Exemplares</span><strong>${Number(order.total || 0)}</strong></div>
         <div><span>Atualizado em</span><strong>${escapeHtml(formatDateTime(order.atualizadoEm))}</strong></div>`;
       el('adminOrderItems').innerHTML = order.itens.map(item => `
         <tr>
           <td>${escapeHtml(item.produto)}</td>
           <td>${escapeHtml(item.codigo || '—')}</td>
           <td class="positive">${Number(item.quantidade || 0)}</td>
+          <td>${item.valorUnitario == null ? '—' : formatCurrency(item.valorUnitario)}</td>
+          <td class="${item.subtotal == null ? 'zero' : 'positive'}">${item.subtotal == null ? '—' : formatCurrency(item.subtotal)}</td>
         </tr>`).join('');
-      el('adminOrderTotal').textContent = String(order.total || 0);
+      el('adminOrderFinancialTotal').textContent = order.valorTotal == null ? '—' : formatCurrency(order.valorTotal);
+      renderAdminOrderFinancialStatus(order);
+      configureAdminOrderFinancialActions(order);
       el('adminOrderModal').classList.remove('hidden');
       document.body.style.overflow = 'hidden';
     } catch (error) {
@@ -775,7 +830,192 @@
   function closeAdminOrderModal() {
     const modal = el('adminOrderModal');
     if (modal) modal.classList.add('hidden');
+    state.admin.currentOrder = null;
     document.body.style.overflow = '';
+  }
+
+
+  function renderAdminOrderFinancialStatus(order) {
+    const container = el('adminOrderFinancialStatus');
+    const status = String(order.situacaoFinanceira || 'A CONFERIR').toUpperCase();
+    const missing = Array.isArray(order.itensSemPreco) ? order.itensSemPreco : [];
+    let title = status;
+    let message = '';
+
+    if (!order.precosCompletos) {
+      title = 'PREÇOS PENDENTES';
+      message = `Preencha na aba PRECOS_TRIMESTRE: ${missing.join(', ')}.`;
+    } else if (status === 'COMPROVANTE ENVIADO') {
+      message = order.comprovanteEnviadoEm
+        ? `Demonstrativo marcado como enviado em ${formatDateTime(order.comprovanteEnviadoEm)}.`
+        : 'Demonstrativo marcado como enviado.';
+    } else if (status === 'CONFERIDO') {
+      message = order.conferidoEm
+        ? `Valores conferidos em ${formatDateTime(order.conferidoEm)}.`
+        : 'Valores conferidos pela Superintendência.';
+    } else {
+      message = 'Os valores estão calculados com os preços atuais. Clique em “Conferir valores” para fixar o demonstrativo.';
+    }
+
+    container.className = `financial-status-card ${financialStatusClass(title)}`;
+    container.innerHTML = `<strong>${escapeHtml(title)}</strong><span>${escapeHtml(message)}</span>`;
+  }
+
+  function configureAdminOrderFinancialActions(order) {
+    const isCurrent = Boolean(order.periodoAtual);
+    const status = String(order.situacaoFinanceira || 'A CONFERIR').toUpperCase();
+    const confirmed = ['CONFERIDO', 'COMPROVANTE ENVIADO'].includes(status);
+
+    const confirmBtn = el('adminConfirmFinancialBtn');
+    confirmBtn.classList.toggle('hidden', !isCurrent);
+    confirmBtn.disabled = !isCurrent || !order.precosCompletos;
+    confirmBtn.textContent = confirmed ? 'Reconferir valores' : 'Conferir valores';
+
+    const whatsapp = el('adminOrderWhatsappBtn');
+    whatsapp.classList.toggle('disabled', !confirmed);
+    whatsapp.setAttribute('aria-disabled', confirmed ? 'false' : 'true');
+    whatsapp.href = confirmed ? buildFinancialWhatsAppUrl(order) : '#';
+
+    const sentBtn = el('adminMarkSentBtn');
+    sentBtn.classList.toggle('hidden', !isCurrent);
+    sentBtn.disabled = !isCurrent || !confirmed || status === 'COMPROVANTE ENVIADO';
+    sentBtn.textContent = status === 'COMPROVANTE ENVIADO' ? 'Comprovante enviado ✓' : 'Marcar como enviado';
+  }
+
+  async function confirmAdminOrderFinancial() {
+    const order = state.admin.currentOrder;
+    if (!order || state.admin.isBusy) return;
+    if (!order.periodoAtual) {
+      toast('O histórico é somente para consulta.', true);
+      return;
+    }
+    if (!order.precosCompletos) {
+      toast('Preencha os preços pendentes na planilha antes de conferir.', true);
+      return;
+    }
+    if (!window.confirm(`Conferir e fixar os valores do pedido de ${order.unidade}?`)) return;
+
+    state.admin.isBusy = true;
+    const button = el('adminConfirmFinancialBtn');
+    const original = button.textContent;
+    button.disabled = true;
+    button.textContent = 'Conferindo...';
+    const requestId = createRequestId();
+
+    try {
+      await postNoCors({
+        action: 'adminConferirPedido',
+        requestId,
+        token: state.admin.token,
+        unidadeId: order.unidadeId,
+        ano: order.ano,
+        trimestre: order.trimestre
+      });
+      const result = await waitForAdminResult('adminActionStatus', requestId);
+      if (!result?.ok) throw new Error(result?.message || 'Não foi possível conferir os valores.');
+
+      const unitId = order.unidadeId;
+      state.admin.isBusy = false;
+      await loadAdminDashboard();
+      await openAdminOrder(unitId);
+      toast(`Pedido conferido: ${formatCurrency(result.valorTotal || 0)}.`);
+    } catch (error) {
+      console.error(error);
+      toast(error.message || 'Não foi possível conferir os valores.', true);
+    } finally {
+      state.admin.isBusy = false;
+      button.disabled = false;
+      if (button.textContent === 'Conferindo...') button.textContent = original;
+    }
+  }
+
+  function buildFinancialMessage(order) {
+    if (!order) return '';
+    const status = String(order.situacaoFinanceira || '').toUpperCase();
+    if (!['CONFERIDO', 'COMPROVANTE ENVIADO'].includes(status)) return '';
+
+    const lines = [
+      '*PEDIDOS DE REVISTAS EBD — AD VIÇOSA*',
+      '*DEMONSTRATIVO DO PEDIDO*',
+      '',
+      `*Sede / Congregação:* ${order.unidade}`,
+      `*Protocolo:* ${order.protocolo}`,
+      `*Período:* ${ordinal(order.trimestre)} Trimestre de ${order.ano}`,
+      '',
+      '*Itens:*'
+    ];
+
+    (order.itens || []).forEach(item => {
+      lines.push(`${Number(item.quantidade || 0)} × ${item.produto} — ${formatCurrency(item.valorUnitario || 0)} = *${formatCurrency(item.subtotal || 0)}*`);
+    });
+
+    lines.push(
+      '',
+      `*TOTAL DO PEDIDO: ${formatCurrency(order.valorTotal || 0)}*`,
+      '',
+      'Pedido conferido pela Superintendência da EBD.',
+      '_Documento de conferência — não fiscal._'
+    );
+    return lines.join('\n');
+  }
+
+  function buildFinancialWhatsAppUrl(order) {
+    const message = buildFinancialMessage(order);
+    if (!message) return '#';
+    const number = normalizeWhatsAppNumber(order.telefone);
+    return number
+      ? `https://wa.me/${number}?text=${encodeURIComponent(message)}`
+      : `https://wa.me/?text=${encodeURIComponent(message)}`;
+  }
+
+  function prepareOrderFinancialWhatsApp(event) {
+    const order = state.admin.currentOrder;
+    const message = buildFinancialMessage(order);
+    if (!message) {
+      event.preventDefault();
+      toast('Confira os valores antes de gerar o demonstrativo.', true);
+      return;
+    }
+    el('adminOrderWhatsappBtn').href = buildFinancialWhatsAppUrl(order);
+  }
+
+  async function markAdminOrderSent() {
+    const order = state.admin.currentOrder;
+    if (!order || state.admin.isBusy || !order.periodoAtual) return;
+    if (!window.confirm(`Marcar o demonstrativo de ${order.unidade} como enviado?`)) return;
+
+    state.admin.isBusy = true;
+    const button = el('adminMarkSentBtn');
+    const original = button.textContent;
+    button.disabled = true;
+    button.textContent = 'Salvando...';
+    const requestId = createRequestId();
+
+    try {
+      await postNoCors({
+        action: 'adminMarcarComprovanteEnviado',
+        requestId,
+        token: state.admin.token,
+        unidadeId: order.unidadeId,
+        ano: order.ano,
+        trimestre: order.trimestre
+      });
+      const result = await waitForAdminResult('adminActionStatus', requestId);
+      if (!result?.ok) throw new Error(result?.message || 'Não foi possível atualizar a situação.');
+
+      const unitId = order.unidadeId;
+      state.admin.isBusy = false;
+      await loadAdminDashboard();
+      await openAdminOrder(unitId);
+      toast('Demonstrativo marcado como enviado.');
+    } catch (error) {
+      console.error(error);
+      toast(error.message || 'Não foi possível atualizar a situação.', true);
+    } finally {
+      state.admin.isBusy = false;
+      button.disabled = false;
+      if (button.textContent === 'Salvando...') button.textContent = original;
+    }
   }
 
   function buildPendingMessage() {
@@ -864,6 +1104,7 @@
     clearAdminToken();
     state.admin.dashboard = null;
     state.admin.periodoSelecionado = '';
+    state.admin.currentOrder = null;
     showAdminLogin();
     toast('Sessão administrativa encerrada.');
   }
@@ -920,6 +1161,33 @@
     const ok = document.execCommand('copy');
     area.remove();
     if (!ok) throw new Error('Falha ao copiar.');
+  }
+
+
+  function formatCurrency(value) {
+    const number = Number(value || 0);
+    return new Intl.NumberFormat('pt-BR', {
+      style: 'currency',
+      currency: 'BRL'
+    }).format(Number.isFinite(number) ? number : 0);
+  }
+
+  function normalizeWhatsAppNumber(value) {
+    let digits = String(value || '').replace(/\D/g, '');
+    if (!digits) return '';
+    if (digits.startsWith('55') && digits.length >= 12) return digits;
+    if (digits.length === 10 || digits.length === 11) digits = `55${digits}`;
+    return digits;
+  }
+
+  function financialStatusClass(value) {
+    const status = String(value || '').toUpperCase();
+    if (status === 'COMPROVANTE ENVIADO') return 'sent';
+    if (status === 'CONFERIDO') return 'confirmed';
+    if (status === 'A CONFERIR') return 'review';
+    if (status === 'PREÇOS PENDENTES') return 'missing';
+    if (status === 'PENDENTE') return 'pending';
+    return 'neutral';
   }
 
   function formatDateTime(value) {
@@ -1019,7 +1287,7 @@
   function registerServiceWorker() {
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./sw.js?v=2.5').catch(error => console.warn('Service Worker:', error));
+        navigator.serviceWorker.register('./sw.js?v=2.7.0').catch(error => console.warn('Service Worker:', error));
       });
     }
   }
