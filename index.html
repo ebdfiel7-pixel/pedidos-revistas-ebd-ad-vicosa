@@ -23,13 +23,13 @@
   <meta name="twitter:description" content="Faça o pedido trimestral de revistas da Escola Bíblica Dominical da AD Viçosa.">
   <meta name="twitter:image" content="https://revistas-ebdvicosa.ebdfiel.com.br/img/compartilhamento-whatsapp.jpg?v=2.6.1">
   <title>Pedidos de Revistas EBD - AD Viçosa</title>
-  <link rel="icon" type="image/png" href="img/favicon.png?v=2.7.0">
-  <link rel="apple-touch-icon" href="img/apple-touch-icon.png?v=2.7.0">
+  <link rel="icon" type="image/png" href="img/favicon.png?v=2.8.0">
+  <link rel="apple-touch-icon" href="img/apple-touch-icon.png?v=2.8.0">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Pedidos EBD">
-  <link rel="manifest" href="manifest.webmanifest?v=2.7.0">
-  <link rel="stylesheet" href="css/style.css?v=2.7.0">
+  <link rel="manifest" href="manifest.webmanifest?v=2.8.0">
+  <link rel="stylesheet" href="css/style.css?v=2.8.0">
 </head>
 <body class="splash-active">
   <div id="splashScreen" class="splash-screen" role="presentation" aria-hidden="true">
@@ -39,7 +39,7 @@
     <div class="splash-content">
       <div class="splash-logo-stage">
         <span class="splash-logo-glow" aria-hidden="true"></span>
-        <img src="img/logo-ad-vicosa.png?v=2.7.0" alt="AD Viçosa Madureira" class="splash-brand-logo">
+        <img src="img/logo-ad-vicosa.png?v=2.8.0" alt="AD Viçosa Madureira" class="splash-brand-logo">
       </div>
       <div class="splash-kicker">Escola Bíblica Dominical • AD Viçosa</div>
       <div class="splash-title">Pedidos de Revistas EBD</div>
@@ -49,7 +49,7 @@
   </div>
   <header class="topbar">
     <div class="brand-wrap">
-      <img src="img/logo-ad-vicosa.png?v=2.7.0" alt="AD Viçosa Madureira" class="brand-logo">
+      <img src="img/logo-ad-vicosa.png?v=2.8.0" alt="AD Viçosa Madureira" class="brand-logo">
       <div class="brand-title">
         <strong>Pedidos de Revistas EBD</strong>
       </div>
@@ -251,7 +251,15 @@
           </div>
         </div>
 
-        <section class="admin-history-card" aria-label="Histórico de trimestres">
+        <nav class="admin-quick-nav" aria-label="Atalhos do painel">
+          <button type="button" data-admin-jump="adminOrdersSection">Pedidos</button>
+          <button type="button" data-admin-jump="adminPricesSection">Preços</button>
+          <button type="button" data-admin-jump="adminFinanceSection">Financeiro</button>
+          <button type="button" data-admin-jump="adminBetelSection">Resumo Betel</button>
+          <button type="button" data-admin-jump="adminSettingsSection">Configurações</button>
+        </nav>
+
+        <section id="adminHistorySection" class="admin-history-card" aria-label="Histórico de trimestres">
           <div class="admin-history-copy">
             <div class="admin-history-heading">
               <span class="eyebrow">Histórico</span>
@@ -316,7 +324,7 @@
         </section>
 
         <div class="admin-grid">
-          <section class="panel admin-section">
+          <section id="adminOrdersSection" class="panel admin-section">
             <div class="admin-section-head">
               <div>
                 <span class="eyebrow">Acompanhamento</span>
@@ -349,12 +357,68 @@
           </section>
         </div>
 
-        <section class="panel admin-section admin-finance-section">
+        <section id="adminPricesSection" class="panel admin-section admin-prices-section">
+          <div class="admin-section-head">
+            <div>
+              <span class="eyebrow">Cadastro rápido</span>
+              <h2>Preços das revistas</h2>
+              <p>Informe ou altere os valores unitários diretamente no painel. Pedidos já conferidos preservam os valores usados na conferência.</p>
+            </div>
+            <div id="adminPricesEditorStatus" class="price-status-chip">—</div>
+          </div>
+          <div class="admin-table-wrap">
+            <table class="admin-table prices-table">
+              <thead>
+                <tr><th>Produto</th><th>Categoria</th><th>Código Betel</th><th>Valor unitário</th></tr>
+              </thead>
+              <tbody id="adminPricesBody"></tbody>
+            </table>
+          </div>
+          <div class="admin-price-actions">
+            <button id="adminResetPricesBtn" class="btn secondary" type="button">Descartar alterações</button>
+            <button id="adminSavePricesBtn" class="btn primary" type="button">Salvar preços</button>
+          </div>
+        </section>
+
+        <section id="adminSettingsSection" class="panel admin-section admin-settings-section">
+          <div class="admin-section-head">
+            <div>
+              <span class="eyebrow">Configurações</span>
+              <h2>Configurações do trimestre</h2>
+              <p id="adminSettingsHelp">Defina o prazo de envio sem precisar abrir a planilha.</p>
+            </div>
+          </div>
+          <div class="admin-settings-grid">
+            <label class="field admin-readonly-field">
+              <span>Período</span>
+              <input id="adminCurrentPeriodInput" type="text" readonly value="—">
+            </label>
+            <label class="field">
+              <span>Data-limite dos pedidos</span>
+              <input id="adminDeadlineInput" type="date">
+            </label>
+            <button id="adminSaveDeadlineBtn" class="btn primary" type="button">Salvar prazo</button>
+          </div>
+          <p class="admin-settings-note">A abertura e o fechamento dos pedidos continuam disponíveis no cartão <strong>Recebimento</strong> acima.</p>
+          <div id="adminNextPeriodBox" class="admin-next-period-box">
+            <div>
+              <span class="eyebrow">Próximo ciclo</span>
+              <h3>Preparar o próximo trimestre</h3>
+              <p>Ao iniciar o próximo período, o trimestre atual ficará preservado no Histórico e o novo período começará com os pedidos fechados.</p>
+            </div>
+            <div class="admin-next-period-action">
+              <strong id="adminNextPeriodLabel">—</strong>
+              <button id="adminStartNextPeriodBtn" class="btn secondary" type="button">Iniciar próximo trimestre</button>
+            </div>
+          </div>
+        </section>
+
+        <section id="adminFinanceSection" class="panel admin-section admin-finance-section">
           <div class="admin-section-head">
             <div>
               <span class="eyebrow">Financeiro</span>
               <h2>Valores por Sede / Congregação</h2>
-              <p id="adminFinanceHelp">Preencha os valores unitários na aba <strong>PRECOS_TRIMESTRE</strong> da Planilha Google. Depois confira cada pedido para gerar o demonstrativo.</p>
+              <p id="adminFinanceHelp">Cadastre os valores na seção <strong>Preços das revistas</strong> deste painel. Depois confira cada pedido para gerar o demonstrativo.</p>
             </div>
             <div id="adminPriceStatus" class="price-status-chip">—</div>
           </div>
@@ -372,7 +436,7 @@
           </div>
         </section>
 
-        <section class="panel admin-section admin-betel-section">
+        <section id="adminBetelSection" class="panel admin-section admin-betel-section">
           <div class="admin-section-head">
             <div>
               <span class="eyebrow">Editora Betel</span>
@@ -435,7 +499,7 @@
 
   <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
 
-  <script src="config.js?v=2.7.0"></script>
-  <script src="js/app.js?v=2.7.0"></script>
+  <script src="config.js?v=2.8.0"></script>
+  <script src="js/app.js?v=2.8.0"></script>
 </body>
 </html>

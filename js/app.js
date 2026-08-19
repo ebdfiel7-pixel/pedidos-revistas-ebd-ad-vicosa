@@ -17,7 +17,8 @@
       periodoSelecionado: '',
       returnView: 'appView',
       currentOrder: null,
-      isBusy: false
+      isBusy: false,
+      pricesDirty: false
     }
   };
 
@@ -111,8 +112,17 @@
     el('adminAccessBtn').addEventListener('click', openAdmin);
     el('backToOrdersBtn').addEventListener('click', () => window.location.reload());
     el('adminLoginForm').addEventListener('submit', adminLogin);
-    el('adminRefreshBtn').addEventListener('click', loadAdminDashboard);
+    el('adminRefreshBtn').addEventListener('click', () => {
+      if (state.admin.pricesDirty && !window.confirm('Existem alterações de preços não salvas. Deseja descartá-las e atualizar o painel?')) return;
+      state.admin.pricesDirty = false;
+      loadAdminDashboard();
+    });
     el('adminPeriodSelect').addEventListener('change', event => {
+      if (state.admin.pricesDirty && !window.confirm('Existem alterações de preços não salvas. Deseja descartá-las e trocar o período?')) {
+        event.target.value = state.admin.periodoSelecionado;
+        return;
+      }
+      state.admin.pricesDirty = false;
       state.admin.periodoSelecionado = event.target.value;
       state.admin.filter = 'all';
       el('adminUnitFilter').value = 'all';
@@ -137,6 +147,17 @@
     el('adminConfirmFinancialBtn').addEventListener('click', confirmAdminOrderFinancial);
     el('adminOrderWhatsappBtn').addEventListener('click', prepareOrderFinancialWhatsApp);
     el('adminMarkSentBtn').addEventListener('click', markAdminOrderSent);
+    el('adminSavePricesBtn').addEventListener('click', saveAdminPrices);
+    el('adminResetPricesBtn').addEventListener('click', () => { state.admin.pricesDirty = false; renderAdminPricesEditor(); });
+    el('adminPricesBody').addEventListener('input', handleAdminPriceInput);
+    el('adminSaveDeadlineBtn').addEventListener('click', saveAdminDeadline);
+    el('adminStartNextPeriodBtn').addEventListener('click', startAdminNextPeriod);
+    $all('[data-admin-jump]').forEach(button => {
+      button.addEventListener('click', () => {
+        const target = el(button.dataset.adminJump);
+        if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      });
+    });
   }
 
   function renderBoot() {
@@ -573,6 +594,7 @@
 
       state.admin.dashboard = result;
       state.admin.periodoSelecionado = `${result.periodo.ano}-${result.periodo.trimestre}`;
+      state.admin.pricesDirty = false;
       el('adminLoginPanel').classList.add('hidden');
       el('adminDashboardPanel').classList.remove('hidden');
       renderAdminDashboard();
@@ -624,6 +646,8 @@
 
     renderAdminUnitList();
     renderPendingList();
+    renderAdminPricesEditor();
+    renderAdminSettings();
     renderAdminFinancialSummary();
     renderAdminBetelSummary();
   }
@@ -720,6 +744,229 @@
   }
 
 
+  function renderAdminPricesEditor() {
+    const data = state.admin.dashboard;
+    if (!data) return;
+    const prices = Array.isArray(data.precos) ? data.precos : [];
+    const isCurrent = Boolean(data.periodo?.atual);
+    const filled = prices.filter(item => item.valor != null).length;
+    const body = el('adminPricesBody');
+    const status = el('adminPricesEditorStatus');
+
+    body.innerHTML = prices.map(item => {
+      const value = item.valor == null ? '' : Number(item.valor).toFixed(2).replace('.', ',');
+      return `
+        <tr>
+          <td data-label="Produto"><strong>${escapeHtml(item.produto)}</strong></td>
+          <td data-label="Categoria">${escapeHtml(item.categoria)}</td>
+          <td data-label="Código Betel">${escapeHtml(item.codigo || '—')}</td>
+          <td data-label="Valor unitário">
+            <div class="price-input-wrap">
+              <span>R$</span>
+              <input class="admin-price-input" type="text" inputmode="decimal" autocomplete="off"
+                data-price-id="${escapeHtml(item.id)}" value="${escapeHtml(value)}" placeholder="0,00" ${isCurrent ? '' : 'disabled'}>
+            </div>
+          </td>
+        </tr>`;
+    }).join('') || '<tr><td colspan="4">Nenhum produto disponível.</td></tr>';
+
+    if (!isCurrent) {
+      status.textContent = 'Histórico — somente leitura';
+      status.className = 'price-status-chip complete';
+    } else if (state.admin.pricesDirty) {
+      status.textContent = 'Alterações não salvas';
+      status.className = 'price-status-chip pending';
+    } else {
+      status.textContent = `${filled}/${prices.length} preços cadastrados`;
+      status.className = `price-status-chip ${filled === prices.length && prices.length ? 'complete' : 'pending'}`;
+    }
+
+    el('adminSavePricesBtn').disabled = !isCurrent || !state.admin.pricesDirty;
+    el('adminResetPricesBtn').disabled = !isCurrent || !state.admin.pricesDirty;
+  }
+
+  function handleAdminPriceInput(event) {
+    if (!event.target.matches('.admin-price-input')) return;
+    event.target.classList.remove('invalid');
+    state.admin.pricesDirty = true;
+    el('adminPricesEditorStatus').textContent = 'Alterações não salvas';
+    el('adminPricesEditorStatus').className = 'price-status-chip pending';
+    el('adminSavePricesBtn').disabled = false;
+    el('adminResetPricesBtn').disabled = false;
+  }
+
+  function parseAdminPrice(value) {
+    const raw = String(value == null ? '' : value).trim();
+    if (!raw) return null;
+    let normalized = raw.replace(/\s/g, '').replace(/^R\$/i, '');
+    if (normalized.includes(',')) normalized = normalized.replace(/\./g, '').replace(',', '.');
+    const number = Number(normalized);
+    return Number.isFinite(number) && number >= 0 ? number : NaN;
+  }
+
+  async function saveAdminPrices() {
+    const data = state.admin.dashboard;
+    if (!data?.periodo?.atual || state.admin.isBusy) return;
+
+    const inputs = $all('#adminPricesBody .admin-price-input');
+    const precos = [];
+    let invalid = false;
+    inputs.forEach(input => {
+      const value = parseAdminPrice(input.value);
+      input.classList.toggle('invalid', Number.isNaN(value));
+      if (Number.isNaN(value)) invalid = true;
+      precos.push({ id: input.dataset.priceId, valor: Number.isNaN(value) ? null : value });
+    });
+    if (invalid) {
+      toast('Revise os valores destacados. Use, por exemplo, 15,90.', true);
+      return;
+    }
+
+    if (!window.confirm('Salvar os preços deste trimestre? Pedidos já conferidos manterão os valores registrados anteriormente.')) return;
+
+    const button = el('adminSavePricesBtn');
+    const original = button.textContent;
+    state.admin.isBusy = true;
+    button.disabled = true;
+    button.textContent = 'Salvando...';
+    const requestId = createRequestId();
+
+    try {
+      await postNoCors({
+        action: 'adminSalvarPrecos',
+        requestId,
+        token: state.admin.token,
+        ano: data.periodo.ano,
+        trimestre: data.periodo.trimestre,
+        precos
+      });
+      const result = await waitForAdminResult('adminActionStatus', requestId);
+      if (!result?.ok) throw new Error(result?.message || 'Não foi possível salvar os preços.');
+      state.admin.pricesDirty = false;
+      state.admin.isBusy = false;
+      await loadAdminDashboard();
+      toast('Preços atualizados com sucesso.');
+    } catch (error) {
+      console.error(error);
+      toast(error.message || 'Não foi possível salvar os preços.', true);
+    } finally {
+      state.admin.isBusy = false;
+      button.disabled = !state.admin.pricesDirty;
+      if (button.textContent === 'Salvando...') button.textContent = original;
+    }
+  }
+
+  function renderAdminSettings() {
+    const data = state.admin.dashboard;
+    if (!data) return;
+    const isCurrent = Boolean(data.periodo?.atual);
+    el('adminCurrentPeriodInput').value = `${ordinal(data.periodo.trimestre)} Trimestre de ${data.periodo.ano}`;
+    el('adminDeadlineInput').value = data.periodo.dataLimite || '';
+    el('adminDeadlineInput').disabled = !isCurrent;
+    el('adminSaveDeadlineBtn').disabled = !isCurrent;
+    el('adminSettingsHelp').textContent = isCurrent
+      ? 'Defina ou altere o prazo de envio diretamente pelo painel.'
+      : 'Períodos anteriores ficam disponíveis somente para consulta.';
+
+    const nextBox = el('adminNextPeriodBox');
+    const nextButton = el('adminStartNextPeriodBtn');
+    if (isCurrent) {
+      const next = getNextQuarter(data.periodo.ano, data.periodo.trimestre);
+      el('adminNextPeriodLabel').textContent = `${ordinal(next.trimestre)} Trimestre de ${next.ano}`;
+      nextBox.classList.remove('hidden');
+      nextButton.disabled = false;
+    } else {
+      nextBox.classList.add('hidden');
+      nextButton.disabled = true;
+    }
+  }
+
+  function getNextQuarter(ano, trimestre) {
+    const t = Number(trimestre);
+    const a = Number(ano);
+    return t >= 4 ? { ano: a + 1, trimestre: 1 } : { ano: a, trimestre: t + 1 };
+  }
+
+  async function saveAdminDeadline() {
+    const data = state.admin.dashboard;
+    if (!data?.periodo?.atual || state.admin.isBusy) return;
+    const dataLimite = el('adminDeadlineInput').value || '';
+    const button = el('adminSaveDeadlineBtn');
+    const original = button.textContent;
+    state.admin.isBusy = true;
+    button.disabled = true;
+    button.textContent = 'Salvando...';
+    const requestId = createRequestId();
+
+    try {
+      await postNoCors({
+        action: 'adminSalvarConfiguracoes',
+        requestId,
+        token: state.admin.token,
+        ano: data.periodo.ano,
+        trimestre: data.periodo.trimestre,
+        dataLimite
+      });
+      const result = await waitForAdminResult('adminActionStatus', requestId);
+      if (!result?.ok) throw new Error(result?.message || 'Não foi possível salvar o prazo.');
+      state.admin.isBusy = false;
+      await loadAdminDashboard();
+      toast(dataLimite ? 'Prazo atualizado com sucesso.' : 'Data-limite removida.');
+    } catch (error) {
+      console.error(error);
+      toast(error.message || 'Não foi possível salvar o prazo.', true);
+    } finally {
+      state.admin.isBusy = false;
+      button.disabled = !state.admin.dashboard?.periodo?.atual;
+      if (button.textContent === 'Salvando...') button.textContent = original;
+    }
+  }
+
+  async function startAdminNextPeriod() {
+    const data = state.admin.dashboard;
+    if (!data?.periodo?.atual || state.admin.isBusy) return;
+    if (state.admin.pricesDirty) {
+      toast('Salve ou descarte as alterações de preços antes de iniciar o próximo trimestre.', true);
+      return;
+    }
+    const next = getNextQuarter(data.periodo.ano, data.periodo.trimestre);
+    const labelAtual = `${ordinal(data.periodo.trimestre)} Trimestre de ${data.periodo.ano}`;
+    const labelNovo = `${ordinal(next.trimestre)} Trimestre de ${next.ano}`;
+    const message = `Iniciar ${labelNovo}?\n\n${labelAtual} será preservado no Histórico. O novo trimestre começará com pedidos fechados e sem data-limite. Depois, cadastre os preços e abra os pedidos quando estiver pronto.`;
+    if (!window.confirm(message)) return;
+
+    const button = el('adminStartNextPeriodBtn');
+    const original = button.textContent;
+    state.admin.isBusy = true;
+    button.disabled = true;
+    button.textContent = 'Preparando...';
+    const requestId = createRequestId();
+
+    try {
+      await postNoCors({
+        action: 'adminIniciarProximoPeriodo',
+        requestId,
+        token: state.admin.token,
+        ano: next.ano,
+        trimestre: next.trimestre
+      });
+      const result = await waitForAdminResult('adminActionStatus', requestId);
+      if (!result?.ok) throw new Error(result?.message || 'Não foi possível iniciar o próximo trimestre.');
+      state.admin.periodoSelecionado = `${next.ano}-${next.trimestre}`;
+      state.admin.pricesDirty = false;
+      state.admin.isBusy = false;
+      await loadAdminDashboard();
+      toast(`${labelNovo} preparado. Cadastre os preços e abra os pedidos quando estiver pronto.`);
+    } catch (error) {
+      console.error(error);
+      toast(error.message || 'Não foi possível iniciar o próximo trimestre.', true);
+    } finally {
+      state.admin.isBusy = false;
+      button.disabled = !state.admin.dashboard?.periodo?.atual;
+      if (button.textContent === 'Preparando...') button.textContent = original;
+    }
+  }
+
   function renderAdminFinancialSummary() {
     const data = state.admin.dashboard;
     if (!data) return;
@@ -735,7 +982,7 @@
         : 'Preços não preparados';
       statusChip.classList.toggle('complete', completos);
       statusChip.classList.toggle('pending', !completos);
-      el('adminFinanceHelp').innerHTML = 'Preencha os valores unitários na aba <strong>PRECOS_TRIMESTRE</strong> da Planilha Google. Depois confira cada pedido para gerar o demonstrativo.';
+      el('adminFinanceHelp').innerHTML = 'Cadastre os valores na seção <strong>Preços das revistas</strong> deste painel. Depois confira cada pedido para gerar o demonstrativo.';
     } else {
       statusChip.textContent = 'Histórico — somente leitura';
       statusChip.classList.add('complete');
@@ -844,7 +1091,7 @@
 
     if (!order.precosCompletos) {
       title = 'PREÇOS PENDENTES';
-      message = `Preencha na aba PRECOS_TRIMESTRE: ${missing.join(', ')}.`;
+      message = `Cadastre os preços pendentes no painel: ${missing.join(', ')}.`;
     } else if (status === 'COMPROVANTE ENVIADO') {
       message = order.comprovanteEnviadoEm
         ? `Demonstrativo marcado como enviado em ${formatDateTime(order.comprovanteEnviadoEm)}.`
@@ -890,7 +1137,7 @@
       return;
     }
     if (!order.precosCompletos) {
-      toast('Preencha os preços pendentes na planilha antes de conferir.', true);
+      toast('Cadastre os preços pendentes no painel antes de conferir.', true);
       return;
     }
     if (!window.confirm(`Conferir e fixar os valores do pedido de ${order.unidade}?`)) return;
@@ -1105,6 +1352,7 @@
     state.admin.dashboard = null;
     state.admin.periodoSelecionado = '';
     state.admin.currentOrder = null;
+    state.admin.pricesDirty = false;
     showAdminLogin();
     toast('Sessão administrativa encerrada.');
   }
@@ -1287,7 +1535,7 @@
   function registerServiceWorker() {
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./sw.js?v=2.7.0').catch(error => console.warn('Service Worker:', error));
+        navigator.serviceWorker.register('./sw.js?v=2.8.0').catch(error => console.warn('Service Worker:', error));
       });
     }
   }
