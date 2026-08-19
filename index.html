@@ -29,7 +29,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Pedidos EBD">
   <link rel="manifest" href="manifest.webmanifest?v=2.8.0">
-  <link rel="stylesheet" href="css/style.css?v=2.9.2">
+  <link rel="stylesheet" href="css/style.css?v=2.9.3">
 </head>
 <body class="splash-active">
   <div id="splashScreen" class="splash-screen" role="presentation" aria-hidden="true">
@@ -59,15 +59,15 @@
   <main class="app-shell">
     <section id="loadingView" class="panel centered">
       <div class="spinner" aria-hidden="true"></div>
-      <h1>Carregando pedidos</h1>
-      <p>Conectando ao sistema da EBD...</p>
+      <h1>Carregando informações</h1>
+      <p>Aguarde um momento...</p>
     </section>
 
     <section id="setupView" class="panel hidden">
       <div class="status-icon warning">!</div>
-      <h1>Configuração necessária</h1>
-      <p>O endereço do Google Apps Script ainda não foi configurado neste aplicativo.</p>
-      <p class="muted">Depois de publicar o Apps Script, cole a URL do Web App no arquivo <code>config.js</code>.</p>
+      <h1>Aplicativo temporariamente indisponível</h1>
+      <p>Não foi possível iniciar o aplicativo neste momento.</p>
+      <p class="muted">Tente novamente em alguns instantes. Se o problema continuar, entre em contato com a Superintendência da EBD.</p>
     </section>
 
     <section id="closedView" class="panel hidden">
@@ -208,7 +208,7 @@
         </div>
 
         <div class="notice warning-soft">
-          Ao confirmar, este pedido será registrado na planilha da Superintendência da EBD. Pedidos já existentes só podem ser corrigidos pelo número do protocolo.
+          Ao confirmar, este pedido será registrado pela Superintendência da EBD. Pedidos já existentes devem ser corrigidos pelo número do protocolo.
         </div>
 
         <div class="workflow-home-row">
@@ -264,7 +264,7 @@
           </label>
           <button id="adminLoginBtn" class="btn primary" type="submit">Entrar no painel</button>
         </form>
-        <p class="admin-login-help">A senha é configurada na própria Planilha Google e não fica armazenada no GitHub.</p>
+        <p class="admin-login-help">Acesso exclusivo da Superintendência da EBD.</p>
       </section>
 
       <section id="adminDashboardPanel" class="hidden">
@@ -414,7 +414,7 @@
             <div>
               <span class="eyebrow">Configurações</span>
               <h2>Configurações do trimestre</h2>
-              <p id="adminSettingsHelp">Defina o prazo de envio sem precisar abrir a planilha.</p>
+              <p id="adminSettingsHelp">Defina ou altere o prazo de envio do trimestre.</p>
             </div>
           </div>
           <div class="admin-settings-grid">
@@ -530,10 +530,18 @@
     </div>
   </div>
 
+  <div id="busyOverlay" class="busy-overlay hidden" role="status" aria-live="polite" aria-atomic="true">
+    <div class="busy-card">
+      <div class="busy-spinner" aria-hidden="true"><span></span></div>
+      <strong id="busyMessage">Carregando informações...</strong>
+      <span class="busy-subtitle">Aguarde um momento</span>
+    </div>
+  </div>
+
   <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
 
   <script src="config.js?v=2.8.0"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/4.2.1/jspdf.umd.min.js" integrity="sha512-+EeCylkt9WHJk5tGJxYdecHOcXFRME7qnbsfeMsdQL6NUPYm2+uGFmyleEqsmVoap/f3dN/sc3BX9t9kHXkHHg==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
-  <script src="js/app.js?v=2.9.2"></script>
+  <script src="js/app.js?v=2.9.3"></script>
 </body>
 </html>

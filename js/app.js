@@ -28,6 +28,9 @@
   const el = id => document.getElementById(id);
   const $all = selector => Array.from(document.querySelectorAll(selector));
 
+  let busyDepth = 0;
+  let busyTimer = null;
+
   document.addEventListener('DOMContentLoaded', () => { initSplash(); init(); });
 
   async function init() {
@@ -50,7 +53,7 @@
       console.error(error);
       showOnly('setupView');
       el('setupView').querySelector('h1').textContent = 'Não foi possível conectar';
-      el('setupView').querySelector('p').textContent = 'Verifique a publicação do Google Apps Script e tente novamente.';
+      el('setupView').querySelector('p').textContent = 'Tente novamente em alguns instantes. Se o problema continuar, entre em contato com a Superintendência da EBD.';
     }
   }
 
@@ -288,6 +291,7 @@
     state.unitHasExistingOrder = false;
     if (!unitId) return false;
 
+    beginBusy('Verificando pedido...');
     try {
       const response = await jsonp('pedidoExiste', {
         unidadeId: unitId,
@@ -299,6 +303,8 @@
     } catch (error) {
       console.warn('Não foi possível verificar pedido existente:', error);
       return false;
+    } finally {
+      endBusy();
     }
   }
 
@@ -345,6 +351,7 @@
     const original = button.textContent;
     button.disabled = true;
     button.textContent = 'Localizando...';
+    beginBusy('Consultando pedido...');
 
     try {
       const response = await jsonp('pedidoPorProtocolo', { protocolo }, 10000);
@@ -386,6 +393,7 @@
       console.error(error);
       toast(error.message || 'Não foi possível localizar o pedido.', true);
     } finally {
+      endBusy();
       button.disabled = false;
       button.textContent = original;
     }
@@ -479,6 +487,7 @@
     const originalText = button.textContent;
     button.disabled = true;
     button.textContent = 'Enviando...';
+    beginBusy(state.editProtocol ? 'Salvando correção...' : 'Enviando pedido...');
 
     const requestId = createRequestId();
     const payload = {
@@ -506,7 +515,7 @@
 
       const confirmation = await waitForConfirmation(requestId);
       if (!confirmation?.ok || !confirmation?.found) {
-        throw new Error('O servidor não confirmou o recebimento do pedido.');
+        throw new Error('O sistema não confirmou o recebimento do pedido.');
       }
 
       showSuccess(confirmation);
@@ -520,6 +529,7 @@
         toast(message || 'Não foi possível confirmar o envio. Verifique sua internet e tente novamente.', true);
       }
     } finally {
+      endBusy();
       state.isSubmitting = false;
       button.disabled = false;
       button.textContent = originalText;
@@ -622,6 +632,7 @@
     const originalText = button.textContent;
     button.disabled = true;
     button.textContent = 'Gerando PDF...';
+    beginBusy('Gerando PDF...');
 
     try {
       const blob = await generateOrderPdf(order);
@@ -647,6 +658,7 @@
       console.error(error);
       toast('Não foi possível gerar ou compartilhar o PDF. Tente novamente.', true);
     } finally {
+      endBusy();
       button.disabled = false;
       button.textContent = originalText;
     }
@@ -974,6 +986,7 @@
     const originalText = button.textContent;
     button.disabled = true;
     button.textContent = 'Entrando...';
+    beginBusy('Entrando no painel...');
 
     const requestId = createRequestId();
     try {
@@ -990,6 +1003,7 @@
       console.error(error);
       toast(error.message || 'Não foi possível acessar o painel.', true);
     } finally {
+      endBusy();
       state.admin.isBusy = false;
       button.disabled = false;
       button.textContent = originalText;
@@ -1003,6 +1017,7 @@
     }
 
     state.admin.isBusy = true;
+    beginBusy('Atualizando painel...');
     try {
       const params = { token: state.admin.token };
       if (state.admin.periodoSelecionado) {
@@ -1032,6 +1047,7 @@
       console.error(error);
       toast(error.message || 'Não foi possível atualizar o painel.', true);
     } finally {
+      endBusy();
       state.admin.isBusy = false;
     }
   }
@@ -1269,7 +1285,7 @@
       precos.push({ id: input.dataset.priceId, valor: Number.isNaN(value) ? null : value });
     });
     if (invalid) {
-      toast('Revise os valores destacados. Use, por exemplo, 15,90.', true);
+      toast('Revise os valores destacados e digite somente números.', true);
       return;
     }
 
@@ -1280,6 +1296,7 @@
     state.admin.isBusy = true;
     button.disabled = true;
     button.textContent = 'Salvando...';
+    beginBusy('Salvando preços...');
     const requestId = createRequestId();
 
     try {
@@ -1301,6 +1318,7 @@
       console.error(error);
       toast(error.message || 'Não foi possível salvar os preços.', true);
     } finally {
+      endBusy();
       state.admin.isBusy = false;
       button.disabled = !state.admin.pricesDirty;
       if (button.textContent === 'Salvando...') button.textContent = original;
@@ -1347,6 +1365,7 @@
     state.admin.isBusy = true;
     button.disabled = true;
     button.textContent = 'Salvando...';
+    beginBusy('Salvando prazo...');
     const requestId = createRequestId();
 
     try {
@@ -1367,6 +1386,7 @@
       console.error(error);
       toast(error.message || 'Não foi possível salvar o prazo.', true);
     } finally {
+      endBusy();
       state.admin.isBusy = false;
       button.disabled = !state.admin.dashboard?.periodo?.atual;
       if (button.textContent === 'Salvando...') button.textContent = original;
@@ -1391,6 +1411,7 @@
     state.admin.isBusy = true;
     button.disabled = true;
     button.textContent = 'Preparando...';
+    beginBusy('Preparando próximo trimestre...');
     const requestId = createRequestId();
 
     try {
@@ -1412,6 +1433,7 @@
       console.error(error);
       toast(error.message || 'Não foi possível iniciar o próximo trimestre.', true);
     } finally {
+      endBusy();
       state.admin.isBusy = false;
       button.disabled = !state.admin.dashboard?.periodo?.atual;
       if (button.textContent === 'Preparando...') button.textContent = original;
@@ -1475,6 +1497,7 @@
 
   async function openAdminOrder(unitId) {
     if (!state.admin.token) return;
+    beginBusy('Carregando pedido...');
     try {
       const p = state.admin.dashboard?.periodo;
       const result = await jsonp('adminPedido', {
@@ -1523,6 +1546,8 @@
     } catch (error) {
       console.error(error);
       toast(error.message || 'Não foi possível abrir os detalhes.', true);
+    } finally {
+      endBusy();
     }
   }
 
@@ -1570,6 +1595,7 @@
     const original = button.textContent;
     button.disabled = true;
     button.textContent = 'Gerando PDF...';
+    beginBusy('Gerando PDF...');
     try {
       const data = buildAdminOrderPdfData(order);
       const blob = await generateOrderPdf(data);
@@ -1590,6 +1616,7 @@
       console.error(error);
       toast('Não foi possível gerar ou compartilhar a cópia do pedido.', true);
     } finally {
+      endBusy();
       button.disabled = false;
       button.textContent = original;
     }
@@ -1602,6 +1629,7 @@
     const original = button.textContent;
     button.disabled = true;
     button.textContent = 'Gerando PDF...';
+    beginBusy('Gerando PDF...');
     try {
       const data = buildAdminOrderPdfData(order);
       const blob = await generateOrderPdf(data);
@@ -1611,6 +1639,7 @@
       console.error(error);
       toast('Não foi possível gerar o PDF do pedido.', true);
     } finally {
+      endBusy();
       button.disabled = false;
       button.textContent = original;
     }
@@ -1681,6 +1710,7 @@
     const original = button.textContent;
     button.disabled = true;
     button.textContent = 'Conferindo...';
+    beginBusy('Conferindo valores...');
     const requestId = createRequestId();
 
     try {
@@ -1704,6 +1734,7 @@
       console.error(error);
       toast(error.message || 'Não foi possível conferir os valores.', true);
     } finally {
+      endBusy();
       state.admin.isBusy = false;
       button.disabled = false;
       if (button.textContent === 'Conferindo...') button.textContent = original;
@@ -1716,26 +1747,26 @@
     if (!['CONFERIDO', 'COMPROVANTE ENVIADO'].includes(status)) return '';
 
     const lines = [
-      '*PEDIDOS DE REVISTAS EBD — AD VIÇOSA*',
-      '*DEMONSTRATIVO DO PEDIDO*',
+      'PEDIDOS DE REVISTAS EBD — AD VIÇOSA',
+      'DEMONSTRATIVO DO PEDIDO',
       '',
-      `*Sede / Congregação:* ${order.unidade}`,
-      `*Protocolo:* ${order.protocolo}`,
-      `*Período:* ${ordinal(order.trimestre)} Trimestre de ${order.ano}`,
+      `Sede / Congregação: ${order.unidade}`,
+      `Protocolo: ${order.protocolo}`,
+      `Período: ${ordinal(order.trimestre)} Trimestre de ${order.ano}`,
       '',
-      '*Itens:*'
+      'Itens:'
     ];
 
     (order.itens || []).forEach(item => {
-      lines.push(`${Number(item.quantidade || 0)} × ${item.produto} — ${formatCurrency(item.valorUnitario || 0)} = *${formatCurrency(item.subtotal || 0)}*`);
+      lines.push(`${Number(item.quantidade || 0)} × ${item.produto} — ${formatCurrency(item.valorUnitario || 0)} = ${formatCurrency(item.subtotal || 0)}`);
     });
 
     lines.push(
       '',
-      `*TOTAL DO PEDIDO: ${formatCurrency(order.valorTotal || 0)}*`,
+      `TOTAL DO PEDIDO: ${formatCurrency(order.valorTotal || 0)}`,
       '',
       'Pedido conferido pela Superintendência da EBD.',
-      '_Documento de conferência — não fiscal._'
+      'Documento de conferência — não fiscal.'
     );
     return lines.join('\n');
   }
@@ -1770,6 +1801,7 @@
     const original = button.textContent;
     button.disabled = true;
     button.textContent = 'Salvando...';
+    beginBusy('Atualizando pedido...');
     const requestId = createRequestId();
 
     try {
@@ -1793,6 +1825,7 @@
       console.error(error);
       toast(error.message || 'Não foi possível atualizar a situação.', true);
     } finally {
+      endBusy();
       state.admin.isBusy = false;
       button.disabled = false;
       if (button.textContent === 'Salvando...') button.textContent = original;
@@ -1808,11 +1841,11 @@
     const periodo = `${ordinal(data.periodo.trimestre)} Trimestre de ${data.periodo.ano}`;
     const deadline = data.periodo.dataLimite ? ` O prazo é ${formatDate(data.periodo.dataLimite)}.` : '';
     return [
-      '*PEDIDOS DE REVISTAS EBD*',
+      'PEDIDOS DE REVISTAS EBD',
       '',
       `Prezados responsáveis pela EBD, ainda não identificamos o envio do pedido de revistas do ${periodo}.${deadline}`,
       '',
-      '*Sede / Congregações pendentes:*',
+      'Sede / Congregações pendentes:',
       ...pending.map(name => `• ${name}`),
       '',
       'Pedimos a gentileza de realizar o pedido dentro do prazo estabelecido.'
@@ -1857,6 +1890,7 @@
     const originalText = button.textContent;
     button.disabled = true;
     button.textContent = 'Atualizando...';
+    beginBusy(nextOpen ? 'Abrindo pedidos...' : 'Fechando pedidos...');
     const requestId = createRequestId();
 
     try {
@@ -1875,6 +1909,7 @@
       console.error(error);
       toast(error.message || 'Não foi possível alterar o período.', true);
     } finally {
+      endBusy();
       state.admin.isBusy = false;
       button.disabled = false;
       if (button.textContent === 'Atualizando...') button.textContent = originalText;
@@ -1925,7 +1960,7 @@
       } catch (_) {}
     }
     if (lastResult?.message) throw new Error(lastResult.message);
-    throw new Error('O servidor não confirmou a operação administrativa.');
+    throw new Error('O sistema não confirmou a operação. Tente novamente.');
   }
 
   async function copyText(text) {
@@ -1982,6 +2017,35 @@
     }).format(date);
   }
 
+  function beginBusy(message = 'Carregando informações...') {
+    const overlay = el('busyOverlay');
+    const label = el('busyMessage');
+    if (!overlay || !label) return;
+
+    busyDepth += 1;
+    label.textContent = message;
+    document.querySelector('main')?.setAttribute('aria-busy', 'true');
+
+    if (busyDepth === 1) {
+      clearTimeout(busyTimer);
+      busyTimer = window.setTimeout(() => {
+        overlay.classList.remove('hidden');
+        document.body.classList.add('app-busy');
+      }, 160);
+    }
+  }
+
+  function endBusy() {
+    busyDepth = Math.max(0, busyDepth - 1);
+    if (busyDepth > 0) return;
+
+    clearTimeout(busyTimer);
+    busyTimer = null;
+    el('busyOverlay')?.classList.add('hidden');
+    document.body.classList.remove('app-busy');
+    document.querySelector('main')?.removeAttribute('aria-busy');
+  }
+
   function showOnly(viewId) {
     ['loadingView', 'setupView', 'closedView', 'appView', 'adminView'].forEach(id => {
       el(id).classList.toggle('hidden', id !== viewId);
@@ -2003,7 +2067,7 @@
       }
 
       window[callbackName] = data => cleanup(null, data);
-      script.onerror = () => cleanup(new Error('Falha ao conectar ao Google Apps Script.'));
+      script.onerror = () => cleanup(new Error('Não foi possível conectar ao sistema.'));
       script.src = `${getApiUrl()}?${query.toString()}`;
       document.body.appendChild(script);
     });
@@ -2069,7 +2133,7 @@
   function registerServiceWorker() {
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./sw.js?v=2.8.0').catch(error => console.warn('Service Worker:', error));
+        navigator.serviceWorker.register('./sw.js?v=2.9.3').catch(error => console.warn('Service Worker:', error));
       });
     }
   }
