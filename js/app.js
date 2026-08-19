@@ -9,6 +9,8 @@
     quantities: {},
     currentStep: 1,
     existingOrder: null,
+    editProtocol: '',
+    unitHasExistingOrder: false,
     isSubmitting: false,
     lastSubmittedOrder: null,
     admin: {
@@ -102,7 +104,19 @@
     el('submitBtn').addEventListener('click', submitOrder);
     el('sharePdfBtn').addEventListener('click', shareLastOrderPdf);
     el('newOrderBtn').addEventListener('click', resetApp);
-    el('unitSelect').addEventListener('change', loadExistingOrder);
+    el('openEditOrderBtn').addEventListener('click', openEditOrderPanel);
+    el('cancelEditOrderBtn').addEventListener('click', cancelEditOrder);
+    el('findEditOrderBtn').addEventListener('click', findOrderByProtocol);
+    el('editProtocolInput').addEventListener('input', event => {
+      event.target.value = String(event.target.value || '').toUpperCase().replace(/\s+/g, '');
+    });
+    el('editProtocolInput').addEventListener('keydown', event => {
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        findOrderByProtocol();
+      }
+    });
+    el('unitSelect').addEventListener('change', checkExistingOrderForUnit);
     el('phoneInput').addEventListener('input', event => {
       event.target.value = formatPhone(event.target.value);
     });
@@ -146,6 +160,8 @@
     el('adminOrderModal').addEventListener('click', event => {
       if (event.target === el('adminOrderModal')) closeAdminOrderModal();
     });
+    el('adminShareOrderPdfBtn').addEventListener('click', shareAdminOrderPdf);
+    el('adminDownloadOrderPdfBtn').addEventListener('click', downloadAdminOrderPdf);
     el('adminConfirmFinancialBtn').addEventListener('click', confirmAdminOrderFinancial);
     el('adminOrderWhatsappBtn').addEventListener('click', prepareOrderFinancialWhatsApp);
     el('adminMarkSentBtn').addEventListener('click', markAdminOrderSent);
@@ -244,37 +260,108 @@
     });
   }
 
-  async function loadExistingOrder() {
-    const unitId = el('unitSelect').value;
-    state.existingOrder = null;
-    state.lastSubmittedOrder = null;
+  function openEditOrderPanel() {
+    el('editOrderPanel').classList.remove('hidden');
     el('existingOrderBanner').classList.add('hidden');
+    window.setTimeout(() => el('editProtocolInput').focus(), 50);
+  }
 
-    if (!unitId || !state.boot) return;
+  function cancelEditOrder() {
+    state.editProtocol = '';
+    state.existingOrder = null;
+    state.unitHasExistingOrder = false;
+    state.lastSubmittedOrder = null;
+    el('editProtocolInput').value = '';
+    el('editOrderPanel').classList.add('hidden');
+    el('existingOrderBanner').classList.add('hidden');
+    el('unitSelect').disabled = false;
+    el('unitSelect').value = '';
+    el('responsibleInput').value = '';
+    el('phoneInput').value = '';
+    Object.keys(state.quantities).forEach(id => { state.quantities[id] = 0; });
+    syncQuantityInputs();
+    toast('Alteração cancelada. Você pode fazer um novo pedido normalmente.');
+  }
 
+  async function checkExistingOrderForUnit() {
+    if (state.editProtocol || !state.boot) return;
+    const unitId = el('unitSelect').value;
+    state.unitHasExistingOrder = false;
+    el('existingOrderBanner').classList.add('hidden');
+    if (!unitId) return;
     try {
-      const response = await jsonp('pedido', {
+      const response = await jsonp('pedidoExiste', {
         unidadeId: unitId,
         ano: state.boot.configuracao.ano,
         trimestre: state.boot.configuracao.trimestre
       });
+      if (response?.ok && response?.existe) {
+        state.unitHasExistingOrder = true;
+        el('existingOrderTitle').textContent = 'Já existe um pedido desta Sede / congregação.';
+        el('existingOrderText').textContent = 'Para corrigir o pedido existente, use “Alterar pedido já enviado” e informe o número do protocolo.';
+        el('existingOrderBanner').classList.remove('hidden');
+      }
+    } catch (error) {
+      console.warn('Não foi possível verificar pedido existente:', error);
+    }
+  }
 
-      if (!response?.ok || !response?.pedido) return;
+  async function findOrderByProtocol() {
+    if (!state.boot) return;
+    const protocolo = String(el('editProtocolInput').value || '').trim().toUpperCase();
+    if (protocolo.length < 8) {
+      toast('Informe o número completo do protocolo.', true);
+      el('editProtocolInput').focus();
+      return;
+    }
 
-      state.existingOrder = response.pedido;
-      el('responsibleInput').value = response.pedido.responsavel || '';
-      el('phoneInput').value = response.pedido.telefone || '';
+    const button = el('findEditOrderBtn');
+    const original = button.textContent;
+    button.disabled = true;
+    button.textContent = 'Localizando...';
+
+    try {
+      const response = await jsonp('pedidoPorProtocolo', { protocolo }, 10000);
+      if (!response?.ok) throw new Error(response?.message || 'Não foi possível localizar o pedido.');
+      if (!response.pedido) {
+        toast('Protocolo não localizado no trimestre atual. Confira o número e tente novamente.', true);
+        return;
+      }
+
+      const pedido = response.pedido;
+      const periodoLocalizado = `${ordinal(pedido.trimestre)} Trimestre de ${pedido.ano}`;
+      if (!window.confirm(`Pedido localizado\n\nSede / Congregação: ${pedido.unidade}\nPeríodo: ${periodoLocalizado}\nProtocolo: ${pedido.protocolo}\n\nDeseja editar este pedido?`)) return;
+
+      state.existingOrder = pedido;
+      state.editProtocol = pedido.protocolo;
+      state.unitHasExistingOrder = false;
+      state.lastSubmittedOrder = null;
+
+      el('unitSelect').value = pedido.unidadeId || '';
+      el('unitSelect').disabled = true;
+      el('responsibleInput').value = pedido.responsavel || '';
+      el('phoneInput').value = pedido.telefone || '';
 
       Object.keys(state.quantities).forEach(id => { state.quantities[id] = 0; });
-      (response.pedido.itens || []).forEach(item => {
+      (pedido.itens || []).forEach(item => {
         if (Object.prototype.hasOwnProperty.call(state.quantities, item.produtoId)) {
           state.quantities[item.produtoId] = Number(item.quantidade) || 0;
         }
       });
       syncQuantityInputs();
+
+      el('existingOrderTitle').textContent = `Pedido localizado: ${pedido.protocolo}`;
+      el('existingOrderText').textContent = `${pedido.unidade} • ${ordinal(pedido.trimestre)} Trimestre de ${pedido.ano}. As quantidades foram carregadas e podem ser corrigidas.`;
       el('existingOrderBanner').classList.remove('hidden');
+      el('editOrderPanel').classList.add('hidden');
+      toast('Pedido localizado. Confira os dados e continue para alterar as quantidades.');
+      el('responsibleInput').focus();
     } catch (error) {
-      console.warn('Não foi possível consultar pedido existente:', error);
+      console.error(error);
+      toast(error.message || 'Não foi possível localizar o pedido.', true);
+    } finally {
+      button.disabled = false;
+      button.textContent = original;
     }
   }
 
@@ -314,6 +401,11 @@
     if (!unit) {
       toast('Selecione a Sede ou a congregação.', true);
       el('unitSelect').focus();
+      return false;
+    }
+    if (state.unitHasExistingOrder && !state.editProtocol) {
+      toast('Já existe um pedido desta Sede / congregação. Para corrigir, use o número do protocolo.', true);
+      openEditOrderPanel();
       return false;
     }
     if (responsible.length < 3) {
@@ -366,6 +458,7 @@
       unidadeId: el('unitSelect').value,
       responsavel: el('responsibleInput').value.trim(),
       telefone: el('phoneInput').value.trim(),
+      edicaoProtocolo: state.editProtocol || '',
       ano: state.boot.configuracao.ano,
       trimestre: state.boot.configuracao.trimestre,
       itens: state.boot.produtos
@@ -404,6 +497,7 @@
       if (attempt > 0) await sleep(700);
       try {
         const response = await jsonp('status', { requestId }, 7000);
+        if (response?.found && response?.ok === false) throw new Error(response.message || 'Não foi possível registrar o pedido.');
         if (response?.ok && response?.found) return response;
       } catch (error) {
         lastError = error;
@@ -425,6 +519,8 @@
     const itens = getSelectedItems();
     const total = getTotal();
 
+    const atualizado = Boolean(confirmation.atualizado || state.editProtocol);
+    el('successTitle').textContent = atualizado ? 'Pedido atualizado com sucesso' : 'Pedido enviado com sucesso';
     el('protocolLabel').textContent = protocolo;
     el('successSummary').innerHTML = `
       <strong>${escapeHtml(unidade)}</strong><br>
@@ -447,7 +543,8 @@
       responsavel,
       telefone,
       itens,
-      total
+      total,
+      atualizado
     };
 
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -463,18 +560,19 @@
       .filter(item => item.quantidade > 0);
   }
 
-  function buildOrderShareMessage({ protocolo, unidade, periodo, responsavel }) {
+  function buildOrderShareMessage({ protocolo, unidade, periodo, responsavel, atualizado = false }) {
     const local = String(unidade || '').trim().toLowerCase() === 'sede'
       ? 'da Sede'
       : `da Congregação ${unidade}`;
+    const tipo = atualizado ? 'pedido atualizado' : 'pedido';
     return [
       'A Paz do Senhor!',
       '',
-      `Segue o pedido das revistas do ${periodo} ${local}.`,
+      `Segue o ${tipo} das revistas do ${periodo} ${local}.`,
       `Responsável: ${responsavel}`,
       `Protocolo: ${protocolo}`,
       '',
-      'O pedido completo segue em PDF anexo.'
+      `O ${tipo} completo segue em PDF anexo.`
     ].join('\n');
   }
 
@@ -732,12 +830,17 @@
 
   function resetApp() {
     state.existingOrder = null;
+    state.editProtocol = '';
+    state.unitHasExistingOrder = false;
     state.lastSubmittedOrder = null;
     Object.keys(state.quantities).forEach(id => { state.quantities[id] = 0; });
     syncQuantityInputs();
+    el('unitSelect').disabled = false;
     el('unitSelect').value = '';
     el('responsibleInput').value = '';
     el('phoneInput').value = '';
+    el('editProtocolInput').value = '';
+    el('editOrderPanel').classList.add('hidden');
     el('existingOrderBanner').classList.add('hidden');
     el('successView').classList.add('hidden');
     goToStep(1);
@@ -950,6 +1053,7 @@
              <span><b>Protocolo:</b> ${escapeHtml(item.protocolo || '—')}</span>
              <span><b>Financeiro:</b> ${escapeHtml(item.situacaoFinanceira || 'A CONFERIR')}</span>
              <span><b>Atualizado:</b> ${escapeHtml(formatDateTime(item.atualizadoEm))}</span>
+             ${String(item.statusPedido || '').toUpperCase() === 'ALTERADO' ? '<span class="finance-status review">Pedido alterado</span>' : ''}
            </div>`
         : '<div class="admin-unit-details pending-text"><span>Nenhum pedido registrado neste trimestre.</span></div>';
 
@@ -1328,6 +1432,7 @@
         <div><span>Telefone</span><strong>${escapeHtml(order.telefone || '—')}</strong></div>
         <div><span>Período</span><strong>${ordinal(order.trimestre)} Trimestre de ${order.ano}</strong></div>
         <div><span>Exemplares</span><strong>${Number(order.total || 0)}</strong></div>
+        <div><span>Situação do pedido</span><strong>${String(order.statusPedido || '').toUpperCase() === 'ALTERADO' ? 'Pedido alterado' : 'Pedido enviado'}</strong></div>
         <div><span>Atualizado em</span><strong>${escapeHtml(formatDateTime(order.atualizadoEm))}</strong></div>`;
       el('adminOrderItems').innerHTML = order.itens.map(item => `
         <tr>
@@ -1355,6 +1460,88 @@
     document.body.style.overflow = '';
   }
 
+
+  function buildAdminOrderPdfData(order) {
+    if (!order) return null;
+    return {
+      protocolo: order.protocolo,
+      unidade: order.unidade,
+      periodo: `${ordinal(order.trimestre)} Trimestre de ${order.ano}`,
+      responsavel: order.responsavel || '—',
+      telefone: order.telefone || '',
+      itens: (order.itens || []).map(item => ({ nome: item.produto, quantidade: Number(item.quantidade || 0) })).filter(item => item.quantidade > 0),
+      total: Number(order.total || 0),
+      atualizado: String(order.statusPedido || '').toUpperCase() === 'ALTERADO'
+    };
+  }
+
+  function buildAdminOrderCopyMessage(order) {
+    const data = buildAdminOrderPdfData(order);
+    if (!data) return '';
+    const local = String(data.unidade || '').trim().toLowerCase() === 'sede' ? 'da Sede' : `da Congregação ${data.unidade}`;
+    return [
+      'A Paz do Senhor!',
+      '',
+      `Segue uma cópia do pedido das revistas do ${data.periodo} ${local}.`,
+      `Responsável: ${data.responsavel}`,
+      `Protocolo: ${data.protocolo}`,
+      '',
+      'O pedido completo segue em PDF anexo.'
+    ].join('\n');
+  }
+
+  async function shareAdminOrderPdf() {
+    const order = state.admin.currentOrder;
+    if (!order) return;
+    const button = el('adminShareOrderPdfBtn');
+    const original = button.textContent;
+    button.disabled = true;
+    button.textContent = 'Gerando PDF...';
+    try {
+      const data = buildAdminOrderPdfData(order);
+      const blob = await generateOrderPdf(data);
+      const filename = buildOrderPdfFilename(data);
+      const file = new File([blob], filename, { type: 'application/pdf' });
+      const text = buildAdminOrderCopyMessage(order);
+      if (navigator.share && navigator.canShare?.({ files: [file] })) {
+        await navigator.share({ title: `Pedido de Revistas EBD - ${data.unidade}`, text, files: [file] });
+        return;
+      }
+      downloadBlob(blob, filename);
+      const number = normalizeWhatsAppNumber(order.telefone);
+      const whatsappUrl = number ? `https://wa.me/${number}?text=${encodeURIComponent(text)}` : `https://wa.me/?text=${encodeURIComponent(text)}`;
+      window.open(whatsappUrl, '_blank', 'noopener,noreferrer');
+      toast('O PDF foi baixado. No WhatsApp, anexe o arquivo à mensagem aberta para o responsável.');
+    } catch (error) {
+      if (error?.name === 'AbortError') return;
+      console.error(error);
+      toast('Não foi possível gerar ou compartilhar a cópia do pedido.', true);
+    } finally {
+      button.disabled = false;
+      button.textContent = original;
+    }
+  }
+
+  async function downloadAdminOrderPdf() {
+    const order = state.admin.currentOrder;
+    if (!order) return;
+    const button = el('adminDownloadOrderPdfBtn');
+    const original = button.textContent;
+    button.disabled = true;
+    button.textContent = 'Gerando PDF...';
+    try {
+      const data = buildAdminOrderPdfData(order);
+      const blob = await generateOrderPdf(data);
+      downloadBlob(blob, buildOrderPdfFilename(data));
+      toast('PDF do pedido baixado.');
+    } catch (error) {
+      console.error(error);
+      toast('Não foi possível gerar o PDF do pedido.', true);
+    } finally {
+      button.disabled = false;
+      button.textContent = original;
+    }
+  }
 
   function renderAdminOrderFinancialStatus(order) {
     const container = el('adminOrderFinancialStatus');

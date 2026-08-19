@@ -109,9 +109,32 @@
           <p>Selecione a Sede ou sua congregação e informe o responsável pelo pedido.</p>
         </div>
 
+        <div class="notice info">
+          <strong>Já enviou e precisa corrigir?</strong>
+          <span>Use somente o número do protocolo para localizar e alterar o pedido.</span>
+          <div class="actions right" style="margin-top:10px">
+            <button id="openEditOrderBtn" class="btn secondary compact" type="button">Alterar pedido já enviado</button>
+          </div>
+        </div>
+
+        <div id="editOrderPanel" class="notice info hidden" aria-live="polite">
+          <strong>Localizar pedido pelo protocolo</strong>
+          <span>Digite o protocolo exatamente como aparece no comprovante, por exemplo: PED-2026-T4-001.</span>
+          <div class="form-grid" style="margin-top:12px">
+            <label class="field full">
+              <span>Número do protocolo</span>
+              <input id="editProtocolInput" type="text" maxlength="40" autocomplete="off" autocapitalize="characters" placeholder="PED-2026-T4-001">
+            </label>
+          </div>
+          <div class="actions split">
+            <button id="cancelEditOrderBtn" class="btn secondary" type="button">Cancelar</button>
+            <button id="findEditOrderBtn" class="btn primary" type="button">Localizar pedido</button>
+          </div>
+        </div>
+
         <div id="existingOrderBanner" class="notice info hidden">
-          <strong>Pedido já localizado.</strong>
-          <span>As quantidades existentes serão carregadas para conferência ou edição.</span>
+          <strong id="existingOrderTitle">Pedido localizado.</strong>
+          <span id="existingOrderText">As quantidades foram carregadas para edição.</span>
         </div>
 
         <div class="form-grid">
@@ -194,7 +217,7 @@
       <section id="successView" class="panel hidden centered">
         <div class="status-icon success">✓</div>
         <span class="eyebrow">Pedido registrado</span>
-        <h1>Pedido enviado com sucesso</h1>
+        <h1 id="successTitle">Pedido enviado com sucesso</h1>
         <p>Guarde o protocolo abaixo para referência.</p>
         <div class="protocol-card">
           <span>Protocolo</span>
@@ -489,11 +512,15 @@
         </table>
       </div>
       <div class="financial-modal-actions">
+        <button id="adminShareOrderPdfBtn" class="btn whatsapp" type="button">Enviar cópia do pedido ao responsável</button>
+        <button id="adminDownloadOrderPdfBtn" class="btn secondary" type="button">Baixar PDF do pedido</button>
+      </div>
+      <div class="financial-modal-actions">
         <button id="adminConfirmFinancialBtn" class="btn primary" type="button">Conferir valores</button>
         <a id="adminOrderWhatsappBtn" class="btn whatsapp" href="#" target="_blank" rel="noopener noreferrer">Enviar demonstrativo</a>
         <button id="adminMarkSentBtn" class="btn secondary" type="button">Marcar como enviado</button>
       </div>
-      <p class="financial-disclaimer">Documento de conferência — não fiscal.</p>
+      <p class="financial-disclaimer">O PDF do pedido mostra somente produtos e quantidades. O demonstrativo financeiro é separado e não fiscal.</p>
     </div>
   </div>
 
@@ -501,6 +528,6 @@
 
   <script src="config.js?v=2.8.0"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/4.2.1/jspdf.umd.min.js" integrity="sha512-+EeCylkt9WHJk5tGJxYdecHOcXFRME7qnbsfeMsdQL6NUPYm2+uGFmyleEqsmVoap/f3dN/sc3BX9t9kHXkHHg==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
-  <script src="js/app.js?v=2.9.0"></script>
+  <script src="js/app.js?v=2.9.1"></script>
 </body>
 </html>
